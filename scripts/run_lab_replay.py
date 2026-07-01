@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Replay manifest-aligned lab Starstim31 epochs through the realtime reconstruction stack."
+    )
+    parser.add_argument(
+        "--data-root",
+        type=Path,
+        default=PROJECT_ROOT / "data",
+        help="Root containing derived/lab_starstim31_epochs_250hz.npz and derived/finetune manifests.",
+    )
+    parser.add_argument("--epoch-npz", type=Path, default=None, help="Optional lab epoch npz override.")
+    parser.add_argument("--target-manifest", type=Path, default=None, help="Optional lab target manifest override.")
+    parser.add_argument("--split-manifest", type=Path, default=None, help="Optional lab split manifest override.")
+    parser.add_argument("--split", choices=["all", "train", "val"], default="all", help="Lab split to replay.")
+    parser.add_argument("--subject", default=None, help="Optional subject folder to replay, e.g. P06 or zar.")
+    parser.add_argument("--device", default="cuda", help="Torch device.")
+    parser.add_argument("--subject-id", type=int, default=0, help="ATMS subject id for optional high-level refinement.")
+    parser.add_argument("--text-prompt", default="a photo of an object", help="Fallback high-level prompt.")
+    parser.add_argument("--disable-high-level", action="store_true", help="Run only low-level reconstruction.")
+    parser.add_argument("--max-trials", type=int, default=10, help="Maximum number of lab trials to replay.")
+    parser.add_argument("--start-trial", type=int, default=0, help="Start from this filtered lab trial index.")
+    parser.add_argument("--sleep-seconds", type=float, default=0.0, help="Optional delay between trials.")
+    parser.add_argument(
+        "--adapter",
+        choices=["starstim31-to-things63", "none"],
+        default="none",
+        help="Use none for a native lab checkpoint, or starstim31-to-things63 for explicit THINGS checkpoint compatibility.",
+    )
+    parser.add_argument(
+        "--lab-low-level-checkpoint",
+        type=Path,
+        default=None,
+        help="Native lab low-level checkpoint. Required when --adapter none.",
+    )
+    parser.add_argument(
+        "--lab-model-channels",
+        type=int,
+        choices=[31, 32],
+        default=None,
+        help="Native lab checkpoint channel count. Defaults to 31 for current lab replay epochs.",
+    )
+    parser.add_argument(
+        "--output-root",
+        type=Path,
+        default=PROJECT_ROOT / "outputs" / "lab_replay",
+        help="Output directory for lab replay reconstructions and metadata.",
+    )
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    if args.adapter == "none":
+        if args.lab_low_level_checkpoint is None:
+            raise SystemExit(
+                "Lab replay is native Starstim by default, but no native lab low-level checkpoint was given. "
+                "The current derived lab epoch file is 31-channel because preprocessing drops Fz. "
+                "Pass --lab-low-level-checkpoint /path/to/checkpoint.pth, or explicitly pass "
+                "--adapter starstim31-to-things63 to run the old THINGS63 compatibility path."
+            )
+        if not args.disable_high_level:
+            raise SystemExit(
+                "Native lab low-level replay is configured, but the high-level ATMS wrapper still defaults to "
+                "the THINGS63 checkpoint. Pass --disable-high-level for native lab replay, or use "
+                "--adapter starstim31-to-things63 for the existing compatibility stack."
+            )
+
+    from maryam_rt.integration.lab_replay import LabReplayConfig, LabReplayRunner
+    from maryam_rt.integration.low_level import LowLevelEpochEncoder, LowLevelVAEDecoder
+
+    checkpoints_dir = PROJECT_ROOT / "checkpoints" / "hierarchical"
+    low_level_checkpoint = args.lab_low_level_checkpoint
+    model_num_channels = args.lab_model_channels or 31
+    if args.adapter == "starstim31-to-things63":
+        low_level_checkpoint = checkpoints_dir / "low_level_encoder_sub01_60.pth"
+        model_num_channels = 63
+    encoder = LowLevelEpochEncoder(
+        checkpoint_path=low_level_checkpoint,
+        device=args.device,
+        model_num_channels=model_num_channels,
+    )
+    decoder = LowLevelVAEDecoder(device=args.device)
+
+    worker = None
+    if not args.disable_high_level:
+        from maryam_rt.integration.high_level import HighLevelRefiner
+        from maryam_rt.integration.worker import SemanticRefinementWorker
+
+        refiner = HighLevelRefiner(
+            atms_checkpoint=checkpoints_dir / "atms_sub01_40.pth",
+            prior_checkpoint=checkpoints_dir / "prior_sub01_fdn.pt",
+            subject_id=args.subject_id,
+            text_prompt=args.text_prompt,
+            device=args.device,
+        )
+        worker = SemanticRefinementWorker(refiner=refiner, output_dir=args.output_root / "high_level")
+        worker.start()
+
+    try:
+        runner = LabReplayRunner(
+            config=LabReplayConfig(
+                data_root=args.data_root,
+                epoch_npz=args.epoch_npz,
+                target_manifest=args.target_manifest,
+                split_manifest=args.split_manifest,
+                output_root=args.output_root,
+                split=args.split,
+                subject=args.subject,
+                max_trials=args.max_trials,
+                start_trial=args.start_trial,
+                sleep_seconds=args.sleep_seconds,
+                adapter=args.adapter,
+            ),
+            encoder=encoder,
+            decoder=decoder,
+            worker=worker,
+        )
+        return runner.run()
+    finally:
+        if worker is not None:
+            worker.stop()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

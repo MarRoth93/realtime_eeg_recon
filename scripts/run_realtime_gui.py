@@ -11,7 +11,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the Maryam realtime browser monitor.")
-    parser.add_argument("--mode", choices=["live", "things-replay"], default="live", help="Source mode for the GUI.")
+    parser.add_argument("--mode", choices=["live", "lab-live", "things-replay", "lab-replay"], default="live", help="Source mode for the GUI.")
     parser.add_argument("--host", default="127.0.0.1", help="Bind host for the local web app.")
     parser.add_argument("--port", type=int, default=8000, help="Bind port for the local web app.")
     parser.add_argument("--device", default="cuda", help="Torch device.")
@@ -28,6 +28,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--poll-interval-ms", type=float, default=5.0, help="Polling interval for marker processing.")
     parser.add_argument("--ring-buffer-seconds", type=float, default=10.0, help="EEG ring buffer duration.")
     parser.add_argument("--image-root", default=None, help="Optional image root used to resolve image_id markers.")
+    parser.add_argument("--eeg-sampling-rate", type=float, default=1000.0, help="Incoming realtime EEG sampling rate.")
 
     parser.add_argument(
         "--data-root",
@@ -51,11 +52,66 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--calibration-max-conditions", type=int, default=40, help="Number of image conditions to use in the calibration block.")
     parser.add_argument("--calibration-repetitions", type=int, default=3, help="Repetitions per condition to use in the calibration block.")
     parser.add_argument("--calibration-sleep-seconds", type=float, default=0.0, help="Optional delay between calibration trials.")
+    parser.add_argument(
+        "--lab-data-root",
+        type=Path,
+        default=PROJECT_ROOT / "data",
+        help="Root containing lab derived artifacts, usually data/derived/...",
+    )
+    parser.add_argument("--lab-epoch-npz", type=Path, default=None, help="Optional lab epoch npz override.")
+    parser.add_argument("--lab-target-manifest", type=Path, default=None, help="Optional lab target manifest override.")
+    parser.add_argument("--lab-split-manifest", type=Path, default=None, help="Optional lab split manifest override.")
+    parser.add_argument("--lab-split", choices=["all", "train", "val"], default="all", help="Lab split to replay.")
+    parser.add_argument("--lab-subject", default=None, help="Optional lab subject folder to replay, e.g. P06 or zar.")
+    parser.add_argument(
+        "--lab-low-level-checkpoint",
+        type=Path,
+        default=None,
+        help="Native 31/32-channel lab low-level checkpoint. Required when --lab-adapter none.",
+    )
+    parser.add_argument(
+        "--lab-model-channels",
+        type=int,
+        choices=[31, 32],
+        default=None,
+        help="Native lab checkpoint channel count. Defaults to 32 for lab-live and 31 for lab-replay.",
+    )
+    parser.add_argument(
+        "--lab-adapter",
+        choices=["starstim31-to-things63", "none"],
+        default="none",
+        help="Use none for a native lab checkpoint, or starstim31-to-things63 for explicit THINGS checkpoint compatibility.",
+    )
     return parser.parse_args()
+
+
+def validate_lab_args(args: argparse.Namespace) -> None:
+    if args.mode not in {"lab-live", "lab-replay"} or args.lab_adapter == "starstim31-to-things63":
+        return
+    if args.lab_low_level_checkpoint is None:
+        if args.mode == "lab-live":
+            raise SystemExit(
+                "lab-live is native Starstim32 by default, but no native lab low-level checkpoint was given. "
+                "Pass --lab-low-level-checkpoint /path/to/checkpoint.pth for 32-channel reconstruction, "
+                "or explicitly pass --lab-adapter starstim31-to-things63 to run the old THINGS63 compatibility path."
+            )
+        raise SystemExit(
+            "lab-replay is native Starstim by default, but no native lab low-level checkpoint was given. "
+            "The current derived lab epoch file is 31-channel because preprocessing drops Fz. "
+            "Pass --lab-low-level-checkpoint /path/to/checkpoint.pth, or explicitly pass "
+            "--lab-adapter starstim31-to-things63 to run the old THINGS63 compatibility path."
+        )
+    if not args.disable_high_level:
+        raise SystemExit(
+            "Native lab low-level mode is configured, but the high-level ATMS wrapper still defaults to the "
+            "THINGS63 checkpoint. Pass --disable-high-level for native lab low-level replay/live mode, or use "
+            "--lab-adapter starstim31-to-things63 for the existing compatibility stack."
+        )
 
 
 def main() -> int:
     args = parse_args()
+    validate_lab_args(args)
 
     import uvicorn
 
@@ -64,8 +120,11 @@ def main() -> int:
     from maryam_rt.integration.low_level import (
         LowLevelEpochEncoder,
         LowLevelRealtimeEncoder,
+        LowLevelStarstimNativeRealtimeEncoder,
+        LowLevelStarstimThingsAdapterRealtimeEncoder,
         LowLevelVAEDecoder,
     )
+    from maryam_rt.integration.lab_replay import LabReplayConfig, LabReplayRunner
     from maryam_rt.integration.things_raw_demo import ThingsRawDemoConfig, ThingsRawDemoRunner
     from maryam_rt.integration.triggered_runner import (
         TriggeredReconstructionRunner,
@@ -74,7 +133,13 @@ def main() -> int:
     from maryam_rt.integration.worker import SemanticRefinementWorker
 
     checkpoints_dir = PROJECT_ROOT / "checkpoints" / "hierarchical"
-    output_root = PROJECT_ROOT / "outputs" / ("gui_live" if args.mode == "live" else "gui_things_replay")
+    output_name = {
+        "live": "gui_live",
+        "lab-live": "gui_lab_live",
+        "things-replay": "gui_things_replay",
+        "lab-replay": "gui_lab_replay",
+    }[args.mode]
+    output_root = PROJECT_ROOT / "outputs" / output_name
     output_low = output_root / "low_level"
     output_high = output_root / "high_level"
     output_meta = output_root / "events"
@@ -102,11 +167,27 @@ def main() -> int:
         worker = SemanticRefinementWorker(refiner=refiner, output_dir=output_high, on_result=_on_refined)
         worker.start()
 
-    if args.mode == "live":
-        encoder = LowLevelRealtimeEncoder(
-            checkpoint_path=checkpoints_dir / "low_level_encoder_sub01_60.pth",
-            device=args.device,
-        )
+    if args.mode in {"live", "lab-live"}:
+        if args.mode == "lab-live":
+            if args.lab_adapter == "starstim31-to-things63":
+                encoder = LowLevelStarstimThingsAdapterRealtimeEncoder(
+                    checkpoint_path=checkpoints_dir / "low_level_encoder_sub01_60.pth",
+                    device=args.device,
+                )
+            else:
+                lab_model_channels = args.lab_model_channels or 32
+                encoder = LowLevelStarstimNativeRealtimeEncoder(
+                    checkpoint_path=args.lab_low_level_checkpoint,
+                    device=args.device,
+                    model_num_channels=lab_model_channels,
+                )
+            eeg_channels = 32
+        else:
+            encoder = LowLevelRealtimeEncoder(
+                checkpoint_path=checkpoints_dir / "low_level_encoder_sub01_60.pth",
+                device=args.device,
+            )
+            eeg_channels = 64
         runner = TriggeredReconstructionRunner(
             encoder=encoder,
             decoder=decoder,
@@ -122,13 +203,15 @@ def main() -> int:
                 post_event_ms=args.post_event_ms,
                 trigger_values=tuple(v.strip() for v in args.trigger_values.split(",") if v.strip()),
                 trigger_cooldown_ms=args.trigger_cooldown_ms,
+                eeg_sampling_rate=args.eeg_sampling_rate,
+                eeg_channels=eeg_channels,
                 poll_interval_ms=args.poll_interval_ms,
                 ring_buffer_seconds=args.ring_buffer_seconds,
                 image_root=args.image_root,
             ),
         )
         controller = LiveController(runner=runner, monitor=monitor)
-    else:
+    elif args.mode == "things-replay":
         encoder = LowLevelEpochEncoder(
             checkpoint_path=checkpoints_dir / "low_level_encoder_sub01_60.pth",
             device=args.device,
@@ -153,6 +236,39 @@ def main() -> int:
                 calibration_max_conditions=args.calibration_max_conditions,
                 calibration_repetitions_per_condition=args.calibration_repetitions,
                 calibration_sleep_seconds=args.calibration_sleep_seconds,
+            ),
+            encoder=encoder,
+            decoder=decoder,
+            worker=worker,
+            monitor=monitor,
+        )
+        controller = ReplayController(runner=runner, monitor=monitor)
+    else:
+        if args.lab_adapter == "starstim31-to-things63":
+            encoder = LowLevelEpochEncoder(
+                checkpoint_path=checkpoints_dir / "low_level_encoder_sub01_60.pth",
+                device=args.device,
+            )
+        else:
+            lab_model_channels = args.lab_model_channels or 31
+            encoder = LowLevelEpochEncoder(
+                checkpoint_path=args.lab_low_level_checkpoint,
+                device=args.device,
+                model_num_channels=lab_model_channels,
+            )
+        runner = LabReplayRunner(
+            config=LabReplayConfig(
+                data_root=args.lab_data_root,
+                epoch_npz=args.lab_epoch_npz,
+                target_manifest=args.lab_target_manifest,
+                split_manifest=args.lab_split_manifest,
+                output_root=output_root,
+                split=args.lab_split,
+                subject=args.lab_subject,
+                max_trials=args.max_trials,
+                start_trial=args.start_trial,
+                sleep_seconds=args.sleep_seconds,
+                adapter=args.lab_adapter,
             ),
             encoder=encoder,
             decoder=decoder,
