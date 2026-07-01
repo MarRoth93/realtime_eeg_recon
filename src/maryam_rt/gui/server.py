@@ -28,7 +28,7 @@ def _html() -> str:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Maryam Realtime Monitor</title>
+  <title>Realtime Monitor</title>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <style>
     body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; background: #f5f1e8; color: #1f2521; }
@@ -49,7 +49,7 @@ def _html() -> str:
 <body>
   <header>
     <div>
-      <div style="font-size: 20px; font-weight: 700;">Maryam Realtime Monitor</div>
+      <div style="font-size: 20px; font-weight: 700;">Realtime Monitor</div>
       <div id="modeLine" style="font-size: 13px; opacity: 0.85;"></div>
     </div>
     <div class="status">
@@ -179,7 +179,7 @@ def _html() -> str:
 
 
 def create_app(controller: GuiController) -> FastAPI:
-    app = FastAPI(title="Maryam Realtime Monitor")
+    app = FastAPI(title="Realtime Monitor")
 
     @app.on_event("startup")
     def _startup() -> None:
@@ -337,4 +337,3 @@ class ReplayController(BaseController):
 
     def eeg_plot_data(self, seconds: float = 6.0, max_channels: int = 8) -> dict[str, Any]:
         return self.runner.eeg_plot_data(seconds=seconds, max_channels=max_channels)
-
