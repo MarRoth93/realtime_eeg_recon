@@ -4,6 +4,7 @@ numpy
 scipy
 torch
 torchvision
+timm>=1.0
 
 # EEG processing
 mne

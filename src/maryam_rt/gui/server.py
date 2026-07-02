@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import threading
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, AsyncIterator, Protocol
 
 import numpy as np
 from fastapi import FastAPI, HTTPException
@@ -179,15 +180,15 @@ def _html() -> str:
 
 
 def create_app(controller: GuiController) -> FastAPI:
-    app = FastAPI(title="Realtime Monitor")
-
-    @app.on_event("startup")
-    def _startup() -> None:
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         controller.start()
+        try:
+            yield
+        finally:
+            controller.stop()
 
-    @app.on_event("shutdown")
-    def _shutdown() -> None:
-        controller.stop()
+    app = FastAPI(title="Realtime Monitor", lifespan=lifespan)
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:

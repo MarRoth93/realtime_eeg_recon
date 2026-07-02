@@ -14,6 +14,7 @@ from PIL import Image
 
 from maryam_rt.gui.monitor import RuntimeMonitorState
 from maryam_rt.integration.high_level import HighLevelRefiner
+from maryam_rt.integration.assessor_ratings import AssessorRatingWriter
 from maryam_rt.integration.low_level import LowLevelRealtimeEncoder, LowLevelVAEDecoder
 from maryam_rt.integration.marker_payload import parse_marker_payload
 from maryam_rt.integration.target_resolver import ImageTargetResolver
@@ -55,6 +56,7 @@ class TriggeredReconstructionRunner:
         output_meta_dir: str | Path,
         config: TriggeredRunnerConfig,
         output_target_dir: str | Path | None = None,
+        assessor_writer: AssessorRatingWriter | None = None,
         monitor: RuntimeMonitorState | None = None,
     ) -> None:
         self.encoder = encoder
@@ -64,6 +66,7 @@ class TriggeredReconstructionRunner:
         self.output_low_dir = Path(output_low_dir)
         self.output_meta_dir = Path(output_meta_dir)
         self.output_target_dir = None if output_target_dir is None else Path(output_target_dir)
+        self.assessor_writer = assessor_writer
         self.monitor = monitor
         self.output_low_dir.mkdir(parents=True, exist_ok=True)
         self.output_meta_dir.mkdir(parents=True, exist_ok=True)
@@ -238,10 +241,23 @@ class TriggeredReconstructionRunner:
         image = image.astype(np.uint8)
         low_path = self.output_low_dir / f"{stem}_low.png"
         Image.fromarray(image).save(low_path)
+        target_copy: Path | None = None
         if target is not None and self.output_target_dir is not None:
             target_copy = self.output_target_dir / f"{stem}_target{target.image_path.suffix}"
             Image.open(target.image_path).save(target_copy)
             metadata["target_copy_path"] = str(target_copy)
+        target_assessor_path = target_copy if target_copy is not None else (None if target is None else target.image_path)
+        if self.assessor_writer is not None:
+            assessor_records = {
+                "low_level": self.assessor_writer.assess_path(low_path, stem, "low_level")
+            }
+            if target_assessor_path is not None:
+                assessor_records["target"] = self.assessor_writer.assess_path(
+                    target_assessor_path,
+                    stem,
+                    "target",
+                )
+            metadata["assessor"] = assessor_records
         (self.output_meta_dir / f"{stem}.json").write_text(json.dumps(metadata, indent=2))
         print(f"saved low-level image for marker '{event.value}' at {event.timestamp:.3f}")
         if self.monitor is not None:
@@ -277,7 +293,14 @@ class TriggeredReconstructionRunner:
 
         x250 = self.encoder.snapshot_last_x250()
         if self.worker is not None and x250 is not None:
-            self.worker.submit(stem=stem, x250=x250, low_level_image=image, text_prompt=text_prompt)
+            self.worker.submit(
+                stem=stem,
+                x250=x250,
+                low_level_image=image,
+                text_prompt=text_prompt,
+                low_level_path=low_path,
+                target_image_path=target_assessor_path,
+            )
 
     def _build_stem(self, event: MarkerEvent) -> str:
         parsed = parse_marker_payload(event.value)

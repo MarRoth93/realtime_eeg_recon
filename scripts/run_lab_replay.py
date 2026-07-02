@@ -56,6 +56,43 @@ def parse_args() -> argparse.Namespace:
         default=PROJECT_ROOT / "outputs" / "lab_replay",
         help="Output directory for lab replay reconstructions and metadata.",
     )
+    parser.add_argument(
+        "--enable-lab-atms-embedding",
+        action="store_true",
+        help="Export Starstim31 ATMS EEG embeddings for each replayed lab trial.",
+    )
+    parser.add_argument(
+        "--lab-atms-checkpoint",
+        type=Path,
+        default=PROJECT_ROOT / "checkpoints" / "hierarchical" / "atms_starstim31_10sub_best.pth",
+        help="Starstim31 ATMS checkpoint used when --enable-lab-atms-embedding is set.",
+    )
+    parser.add_argument(
+        "--lab-atms-subject-id",
+        type=int,
+        default=None,
+        help="Override lab_subject_id from the split manifest for ATMS subject conditioning.",
+    )
+    parser.add_argument(
+        "--enable-assessor-ratings",
+        action="store_true",
+        help="Rate reconstructed low/high images with the local VA and six-dimension assessors.",
+    )
+    parser.add_argument(
+        "--assessor-va-bundle",
+        type=Path,
+        default=PROJECT_ROOT / "checkpoints" / "assessor" / "assessor_va_mixed_v4_bundle.pt",
+        help="Local valence/arousal assessor bundle.",
+    )
+    parser.add_argument(
+        "--assessor-six-bundle",
+        type=Path,
+        default=PROJECT_ROOT / "checkpoints" / "assessor" / "assessor_six_clip_v3_bundle.pt",
+        help="Local six-dimension assessor bundle.",
+    )
+    parser.add_argument("--assessor-device", default=None, help="Torch device for assessor CLIP inference.")
+    parser.add_argument("--assessor-interval-level", type=float, default=0.9, help="Conformal interval level.")
+    parser.add_argument("--disable-assessor-ood", action="store_true", help="Skip assessor OOD percentiles.")
     return parser.parse_args()
 
 
@@ -93,6 +130,26 @@ def main() -> int:
     decoder = LowLevelVAEDecoder(device=args.device)
 
     worker = None
+    atms_embedder = None
+    assessor_writer = None
+    if args.enable_assessor_ratings:
+        from maryam_rt.integration.assessor_ratings import AssessorRatingEngine, AssessorRatingWriter
+
+        assessor_engine = AssessorRatingEngine(
+            va_bundle=args.assessor_va_bundle,
+            six_bundle=args.assessor_six_bundle,
+            device=args.assessor_device or args.device,
+            interval_level=args.assessor_interval_level,
+            include_ood=not args.disable_assessor_ood,
+        )
+        assessor_writer = AssessorRatingWriter(assessor_engine, args.output_root / "assessments")
+    if args.enable_lab_atms_embedding:
+        from maryam_rt.integration.starstim31_atms import Starstim31ATMSEmbedder
+
+        atms_embedder = Starstim31ATMSEmbedder(
+            checkpoint_path=args.lab_atms_checkpoint,
+            device=args.device,
+        )
     if not args.disable_high_level:
         from maryam_rt.integration.high_level import HighLevelRefiner
         from maryam_rt.integration.worker import SemanticRefinementWorker
@@ -104,7 +161,11 @@ def main() -> int:
             text_prompt=args.text_prompt,
             device=args.device,
         )
-        worker = SemanticRefinementWorker(refiner=refiner, output_dir=args.output_root / "high_level")
+        worker = SemanticRefinementWorker(
+            refiner=refiner,
+            output_dir=args.output_root / "high_level",
+            assessor_writer=assessor_writer,
+        )
         worker.start()
 
     try:
@@ -121,10 +182,13 @@ def main() -> int:
                 start_trial=args.start_trial,
                 sleep_seconds=args.sleep_seconds,
                 adapter=args.adapter,
+                atms_subject_id=args.lab_atms_subject_id,
             ),
             encoder=encoder,
             decoder=decoder,
             worker=worker,
+            atms_embedder=atms_embedder,
+            assessor_writer=assessor_writer,
         )
         return runner.run()
     finally:

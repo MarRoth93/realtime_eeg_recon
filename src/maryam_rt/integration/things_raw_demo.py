@@ -18,6 +18,7 @@ from sklearn.discriminant_analysis import _cov
 from sklearn.utils import shuffle
 
 from maryam_rt.gui.monitor import RuntimeMonitorState
+from maryam_rt.integration.assessor_ratings import AssessorRatingWriter
 from maryam_rt.integration.high_level import HighLevelRefiner
 from maryam_rt.integration.low_level import LowLevelEpochEncoder, LowLevelVAEDecoder
 from maryam_rt.integration.worker import SemanticRefinementWorker
@@ -526,12 +527,14 @@ class ThingsRawDemoRunner:
         encoder: LowLevelEpochEncoder,
         decoder: LowLevelVAEDecoder,
         worker: Optional[SemanticRefinementWorker],
+        assessor_writer: AssessorRatingWriter | None = None,
         monitor: RuntimeMonitorState | None = None,
     ) -> None:
         self.config = config
         self.encoder = encoder
         self.decoder = decoder
         self.worker = worker
+        self.assessor_writer = assessor_writer
         self.monitor = monitor
         self._stop_event = threading.Event()
         self._plot_lock = threading.Lock()
@@ -547,10 +550,13 @@ class ThingsRawDemoRunner:
         self.output_root = config.output_root or Path.cwd() / "outputs" / "things_raw_demo"
         self.low_dir = self.output_root / "low_level"
         self.high_dir = self.output_root / "high_level"
+        self.assessment_dir = self.output_root / "assessments"
         self.target_dir = self.output_root / "targets"
         self.meta_dir = self.output_root / "metadata"
         for directory in [self.low_dir, self.high_dir, self.target_dir, self.meta_dir]:
             directory.mkdir(parents=True, exist_ok=True)
+        if self.assessor_writer is not None:
+            self.assessment_dir.mkdir(parents=True, exist_ok=True)
 
     def run(self) -> int:
         if self.config.calibration_enabled:
@@ -809,6 +815,23 @@ class ThingsRawDemoRunner:
             "model_epoch_shape": list(trial.epoch_x250.shape),
             "image_path": str(trial.image_path) if trial.image_path else None,
         }
+        target_copy: Path | None = None
+        if trial.image_path is not None and self.config.copy_targets:
+            target_copy = self.target_dir / f"{stem}_target{trial.image_path.suffix}"
+            shutil.copy2(trial.image_path, target_copy)
+            metadata["target_copy_path"] = str(target_copy)
+        target_assessor_path = target_copy or trial.image_path
+        if self.assessor_writer is not None:
+            assessor_records = {
+                "low_level": self.assessor_writer.assess_path(low_path, stem, "low_level")
+            }
+            if target_assessor_path is not None:
+                assessor_records["target"] = self.assessor_writer.assess_path(
+                    target_assessor_path,
+                    stem,
+                    "target",
+                )
+            metadata["assessor"] = assessor_records
         offline_match = compare_trial_to_saved_offline(
             trial.epoch_x250,
             trial.event_code,
@@ -818,11 +841,6 @@ class ThingsRawDemoRunner:
         if offline_match is not None:
             metadata["offline_saved_match"] = offline_match
         (self.meta_dir / f"{stem}.json").write_text(json.dumps(metadata, indent=2))
-
-        target_copy: Path | None = None
-        if trial.image_path is not None and self.config.copy_targets:
-            target_copy = self.target_dir / f"{stem}_target{trial.image_path.suffix}"
-            shutil.copy2(trial.image_path, target_copy)
 
         if self.monitor is not None:
             self.monitor.add_marker(
@@ -865,6 +883,8 @@ class ThingsRawDemoRunner:
                 x250=x250,
                 low_level_image=image,
                 text_prompt=self._text_prompt_for_trial(trial),
+                low_level_path=low_path,
+                target_image_path=target_assessor_path,
             )
 
         print(

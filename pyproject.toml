@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "maryam-realtime-eeg-recon"
+version = "0.1.0"
+description = "Realtime EEG-to-image reconstruction runtime and browser monitor."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+    "torch",
+    "torchvision",
+    "timm>=1.0",
+    "pylsl",
+    "mne",
+    "einops>=0.6.0",
+    "reformer-pytorch",
+    "diffusers>=0.31.0",
+    "transformers>=4.44.0,<5",
+    "accelerate>=0.33.0",
+    "safetensors>=0.4.3",
+    "huggingface_hub>=0.20.0",
+    "pillow",
+    "tqdm",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+full = [
+    "mne-bids",
+    "onnx",
+    "onnxruntime",
+    "onnxsim",
+    "open_clip_torch>=2.20.0",
+    "openneuro-py",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

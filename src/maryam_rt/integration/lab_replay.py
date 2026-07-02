@@ -14,30 +14,13 @@ import torch
 from PIL import Image
 
 from maryam_rt.gui.monitor import RuntimeMonitorState
+from maryam_rt.integration.montage import STARSTIM_31_CHANNELS, THINGS_63_CHANNELS
 
 if TYPE_CHECKING:
+    from maryam_rt.integration.assessor_ratings import AssessorRatingWriter
     from maryam_rt.integration.low_level import LowLevelEpochEncoder, LowLevelVAEDecoder
+    from maryam_rt.integration.starstim31_atms import Starstim31ATMSEmbedder
     from maryam_rt.integration.worker import SemanticRefinementWorker
-
-
-THINGS_63_CHANNELS = [
-    "Fp1", "Fp2", "AF7", "AF3", "AFz", "AF4", "AF8", "F7", "F5", "F3",
-    "F1", "F2", "F4", "F6", "F8", "FT9", "FT7", "FC5", "FC3", "FC1",
-    "FCz", "FC2", "FC4", "FC6", "FT8", "FT10", "T7", "C5", "C3", "C1",
-    "Cz", "C2", "C4", "C6", "T8", "TP9", "TP7", "CP5", "CP3", "CP1",
-    "CPz", "CP2", "CP4", "CP6", "TP8", "TP10", "P7", "P5", "P3", "P1",
-    "Pz", "P2", "P4", "P6", "P8", "PO7", "PO3", "POz", "PO4", "PO8",
-    "O1", "Oz", "O2",
-]
-
-
-STARSTIM_31_CHANNELS = [
-    "P8", "T8", "CP6", "FC6", "F8", "F4", "C4", "P4",
-    "AF4", "Fp2", "Fp1", "AF3", "FC2", "Cz", "CP2",
-    "PO3", "O1", "Oz", "O2", "PO4", "Pz", "CP1", "FC1",
-    "P3", "C3", "F3", "F7", "FC5", "CP5", "T7", "P7",
-]
-
 
 @dataclass(frozen=True)
 class LabReplayConfig:
@@ -53,6 +36,7 @@ class LabReplayConfig:
     sleep_seconds: float = 0.0
     adapter: str = "none"
     copy_targets: bool = True
+    atms_subject_id: Optional[int] = None
 
 
 @dataclass(frozen=True)
@@ -62,6 +46,7 @@ class LabTrial:
     target_index: int
     trigger: int
     subject: str
+    lab_subject_id: Optional[int]
     category: str
     split: str
     epoch_lab31: np.ndarray
@@ -119,6 +104,12 @@ def _resolve_image_path(row: dict[str, str]) -> Optional[Path]:
         if path.exists():
             return path
     return None
+
+
+def _optional_int(value: str | None) -> Optional[int]:
+    if value is None or value == "":
+        return None
+    return int(value)
 
 
 def load_lab_trials(config: LabReplayConfig) -> list[LabTrial]:
@@ -179,6 +170,7 @@ def load_lab_trials(config: LabReplayConfig) -> list[LabTrial]:
                 target_index=target_index,
                 trigger=int(row["trigger"]),
                 subject=subject,
+                lab_subject_id=_optional_int(row.get("lab_subject_id")),
                 category=row.get("category") or target_row.get("category", ""),
                 split=split,
                 epoch_lab31=epoch_lab31,
@@ -199,22 +191,32 @@ class LabReplayRunner:
         encoder: LowLevelEpochEncoder,
         decoder: LowLevelVAEDecoder,
         worker: Optional[SemanticRefinementWorker],
+        atms_embedder: Optional[Starstim31ATMSEmbedder] = None,
+        assessor_writer: Optional[AssessorRatingWriter] = None,
         monitor: RuntimeMonitorState | None = None,
     ) -> None:
         self.config = config
         self.encoder = encoder
         self.decoder = decoder
         self.worker = worker
+        self.atms_embedder = atms_embedder
+        self.assessor_writer = assessor_writer
         self.monitor = monitor
         self._stop_event = threading.Event()
 
         self.output_root = _output_root(config)
         self.low_dir = self.output_root / "low_level"
         self.high_dir = self.output_root / "high_level"
+        self.embedding_dir = self.output_root / "embeddings"
+        self.assessment_dir = self.output_root / "assessments"
         self.target_dir = self.output_root / "targets"
         self.meta_dir = self.output_root / "metadata"
         for directory in [self.low_dir, self.high_dir, self.target_dir, self.meta_dir]:
             directory.mkdir(parents=True, exist_ok=True)
+        if self.atms_embedder is not None:
+            self.embedding_dir.mkdir(parents=True, exist_ok=True)
+        if self.assessor_writer is not None:
+            self.assessment_dir.mkdir(parents=True, exist_ok=True)
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -298,6 +300,7 @@ class LabReplayRunner:
             "target_index": trial.target_index,
             "trigger": trial.trigger,
             "subject": trial.subject,
+            "lab_subject_id": trial.lab_subject_id,
             "category": trial.category,
             "split": trial.split,
             "usable_for_finetune": trial.usable_for_finetune,
@@ -306,10 +309,40 @@ class LabReplayRunner:
             "image_path": None if trial.image_path is None else str(trial.image_path),
             "low_level_path": str(low_path),
         }
+        target_copy: Path | None = None
         if trial.image_path is not None and self.config.copy_targets:
             target_copy = self.target_dir / f"{stem}_target{trial.image_path.suffix}"
             shutil.copy2(trial.image_path, target_copy)
             metadata["target_copy_path"] = str(target_copy)
+        target_assessor_path = target_copy or trial.image_path
+        if self.assessor_writer is not None:
+            assessor_records = {
+                "low_level": self.assessor_writer.assess_path(low_path, stem, "low_level")
+            }
+            if target_assessor_path is not None:
+                assessor_records["target"] = self.assessor_writer.assess_path(
+                    target_assessor_path,
+                    stem,
+                    "target",
+                )
+            metadata["assessor"] = assessor_records
+        if self.atms_embedder is not None:
+            atms_subject_id = (
+                self.config.atms_subject_id
+                if self.config.atms_subject_id is not None
+                else trial.lab_subject_id
+            )
+            if atms_subject_id is None:
+                raise ValueError(
+                    "ATMS embedding is enabled, but the lab replay manifest has no lab_subject_id. "
+                    "Pass --lab-atms-subject-id explicitly."
+                )
+            embedding_path = self.embedding_dir / f"{stem}_starstim31_atms.pt"
+            metadata["starstim31_atms_embedding"] = self.atms_embedder.save_embedding(
+                trial.epoch_lab31,
+                subject_id=atms_subject_id,
+                output_path=embedding_path,
+            )
         (self.meta_dir / f"{stem}.json").write_text(json.dumps(metadata, indent=2))
 
         if self.monitor is not None:
@@ -327,4 +360,16 @@ class LabReplayRunner:
         x250 = self.encoder.snapshot_last_x250()
         if self.worker is not None and x250 is not None:
             prompt = trial.category.replace("_", " ") if trial.category else None
-            self.worker.submit(stem=stem, x250=x250, low_level_image=image, text_prompt=prompt)
+            self.worker.submit(
+                stem=stem,
+                x250=x250,
+                low_level_image=image,
+                text_prompt=prompt,
+                low_level_path=low_path,
+                target_image_path=target_assessor_path,
+            )
+
+    def eeg_plot_data(self, seconds: float = 6.0, max_channels: int = 8) -> dict[str, object]:
+        if self.monitor is None:
+            return {"sampling_rate": None, "window_seconds": None, "traces": [], "markers": []}
+        return self.monitor.latest_epoch_plot(max_channels=max_channels)

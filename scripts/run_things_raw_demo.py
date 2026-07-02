@@ -16,8 +16,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--data-root",
         type=Path,
-        default=Path("/home/psycontrol/01_Marco_ssd/Hierarchical_EEG2Image_Reconstruction/data"),
-        help="Root containing raw_eeg/, training_images/, and test_images/.",
+        default=PROJECT_ROOT.parent / "Hierarchical_EEG2Image_Reconstruction" / "data",
+        help="Root containing raw_eeg/, training_images/, and test_images/ for THINGS replay.",
     )
     parser.add_argument("--subject", default="sub-01", help="Dataset subject.")
     parser.add_argument("--session", default="ses-01", help="Dataset session.")

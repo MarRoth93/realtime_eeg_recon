@@ -33,8 +33,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--data-root",
         type=Path,
-        default=Path("/home/psycontrol/01_Marco_ssd/Hierarchical_EEG2Image_Reconstruction/data"),
-        help="Root containing raw_eeg/, training_images/, and test_images/.",
+        default=PROJECT_ROOT.parent / "Hierarchical_EEG2Image_Reconstruction" / "data",
+        help="Root containing raw_eeg/, training_images/, and test_images/ for THINGS replay.",
     )
     parser.add_argument("--subject", default="sub-01", help="Dataset subject for THINGS replay mode.")
     parser.add_argument("--session", default="ses-01", help="Dataset session for THINGS replay mode.")
@@ -82,10 +82,49 @@ def parse_args() -> argparse.Namespace:
         default="none",
         help="Use none for a native lab checkpoint, or starstim31-to-things63 for explicit THINGS checkpoint compatibility.",
     )
+    parser.add_argument(
+        "--enable-lab-atms-embedding",
+        action="store_true",
+        help="In lab-replay GUI mode, export Starstim31 ATMS EEG embeddings for replayed trials.",
+    )
+    parser.add_argument(
+        "--lab-atms-checkpoint",
+        type=Path,
+        default=PROJECT_ROOT / "checkpoints" / "hierarchical" / "atms_starstim31_10sub_best.pth",
+        help="Starstim31 ATMS checkpoint used when --enable-lab-atms-embedding is set.",
+    )
+    parser.add_argument(
+        "--lab-atms-subject-id",
+        type=int,
+        default=None,
+        help="Override lab_subject_id from the split manifest for ATMS subject conditioning.",
+    )
+    parser.add_argument(
+        "--enable-assessor-ratings",
+        action="store_true",
+        help="Rate reconstructed low/high images with the local VA and six-dimension assessors.",
+    )
+    parser.add_argument(
+        "--assessor-va-bundle",
+        type=Path,
+        default=PROJECT_ROOT / "checkpoints" / "assessor" / "assessor_va_mixed_v4_bundle.pt",
+        help="Local valence/arousal assessor bundle.",
+    )
+    parser.add_argument(
+        "--assessor-six-bundle",
+        type=Path,
+        default=PROJECT_ROOT / "checkpoints" / "assessor" / "assessor_six_clip_v3_bundle.pt",
+        help="Local six-dimension assessor bundle.",
+    )
+    parser.add_argument("--assessor-device", default=None, help="Torch device for assessor CLIP inference.")
+    parser.add_argument("--assessor-interval-level", type=float, default=0.9, help="Conformal interval level.")
+    parser.add_argument("--disable-assessor-ood", action="store_true", help="Skip assessor OOD percentiles.")
     return parser.parse_args()
 
 
 def validate_lab_args(args: argparse.Namespace) -> None:
+    if args.enable_lab_atms_embedding and args.mode != "lab-replay":
+        raise SystemExit("--enable-lab-atms-embedding is currently wired for --mode lab-replay.")
     if args.mode not in {"lab-live", "lab-replay"} or args.lab_adapter == "starstim31-to-things63":
         return
     if args.lab_low_level_checkpoint is None:
@@ -151,6 +190,26 @@ def main() -> int:
     decoder = LowLevelVAEDecoder(device=args.device)
 
     worker = None
+    atms_embedder = None
+    assessor_writer = None
+    if args.enable_assessor_ratings:
+        from maryam_rt.integration.assessor_ratings import AssessorRatingEngine, AssessorRatingWriter
+
+        assessor_engine = AssessorRatingEngine(
+            va_bundle=args.assessor_va_bundle,
+            six_bundle=args.assessor_six_bundle,
+            device=args.assessor_device or args.device,
+            interval_level=args.assessor_interval_level,
+            include_ood=not args.disable_assessor_ood,
+        )
+        assessor_writer = AssessorRatingWriter(assessor_engine, output_root / "assessments")
+    if args.enable_lab_atms_embedding:
+        from maryam_rt.integration.starstim31_atms import Starstim31ATMSEmbedder
+
+        atms_embedder = Starstim31ATMSEmbedder(
+            checkpoint_path=args.lab_atms_checkpoint,
+            device=args.device,
+        )
     if not args.disable_high_level:
         from maryam_rt.integration.high_level import HighLevelRefiner
 
@@ -164,7 +223,12 @@ def main() -> int:
             text_prompt=args.text_prompt,
             device=args.device,
         )
-        worker = SemanticRefinementWorker(refiner=refiner, output_dir=output_high, on_result=_on_refined)
+        worker = SemanticRefinementWorker(
+            refiner=refiner,
+            output_dir=output_high,
+            on_result=_on_refined,
+            assessor_writer=assessor_writer,
+        )
         worker.start()
 
     if args.mode in {"live", "lab-live"}:
@@ -195,6 +259,7 @@ def main() -> int:
             output_low_dir=output_low,
             output_meta_dir=output_meta,
             output_target_dir=output_targets,
+            assessor_writer=assessor_writer,
             monitor=monitor,
             config=TriggeredRunnerConfig(
                 eeg_stream_name=args.eeg_stream_name,
@@ -240,6 +305,7 @@ def main() -> int:
             encoder=encoder,
             decoder=decoder,
             worker=worker,
+            assessor_writer=assessor_writer,
             monitor=monitor,
         )
         controller = ReplayController(runner=runner, monitor=monitor)
@@ -269,10 +335,13 @@ def main() -> int:
                 start_trial=args.start_trial,
                 sleep_seconds=args.sleep_seconds,
                 adapter=args.lab_adapter,
+                atms_subject_id=args.lab_atms_subject_id,
             ),
             encoder=encoder,
             decoder=decoder,
             worker=worker,
+            atms_embedder=atms_embedder,
+            assessor_writer=assessor_writer,
             monitor=monitor,
         )
         controller = ReplayController(runner=runner, monitor=monitor)
