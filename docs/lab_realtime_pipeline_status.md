@@ -118,6 +118,7 @@ assessor project.
 
 ```text
 P07 EEG epoch -> Starstim31 ATMS embedding              works
+Starstim32 live epoch -> offline-style 31x250 input     wired for native lab-live
 SDXL VAE loading from cache                             works
 target/low/high images -> VA/six ratings + final summary figure wired, needs CLIP backbone cache
 P07 EEG epoch -> low-level image                        blocked by missing native low-level checkpoint

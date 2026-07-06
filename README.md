@@ -227,7 +227,19 @@ Markers can be plain strings or JSON payloads with `event`, `image_id`, or
 
 ## Lab Live Mode
 
-Use this for Starstim-style 32-channel live EEG:
+Use this for Starstim-style 32-channel live EEG. Native `lab-live` applies the
+same model-facing preprocessing as the offline lab extraction: raw 32-channel
+Starstim epoch, drop `Fz`, average reference, resample to 250 Hz,
+baseline-correct on `-200..0 ms`, then crop `0..1 s` to `31 x 250`.
+
+First confirm the LSL stream names exposed by NIC2 and the marker source:
+
+```bash
+python scripts/list_lsl_streams.py
+```
+
+Use the reported EEG stream name for `--eeg-stream-name`. The marker stream
+must emit `stim_onset` or JSON payloads with an `event` field.
 
 ```bash
 python scripts/run_realtime_gui.py \
@@ -235,13 +247,17 @@ python scripts/run_realtime_gui.py \
   --eeg-stream-name StarstimEEG \
   --marker-stream-name TaskMarkers \
   --trigger-values stim_onset \
-  --lab-low-level-checkpoint /path/to/starstim32_low_level.pth \
-  --lab-model-channels 32 \
+  --lab-low-level-checkpoint /path/to/starstim31_low_level.pth \
+  --lab-model-channels 31 \
   --image-root /path/to/object_images \
   --disable-high-level \
   --host 127.0.0.1 \
   --port 8010
 ```
+
+Native `lab-live` defaults to `--eeg-sampling-rate 500`, `--pre-event-ms 200`,
+and `--post-event-ms 1000`. Override those only if the NIC2 LSL stream is
+configured differently.
 
 Expected Starstim32 channel order:
 

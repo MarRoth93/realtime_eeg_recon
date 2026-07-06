@@ -6,7 +6,7 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import numpy as np
 import torch
@@ -42,6 +42,7 @@ class TriggeredRunnerConfig:
     poll_interval_ms: float = 5.0
     connect_timeout_s: float = 10.0
     image_root: str | None = None
+    expected_epoch_samples: int | None = 1000
 
 
 class TriggeredReconstructionRunner:
@@ -56,6 +57,7 @@ class TriggeredReconstructionRunner:
         output_meta_dir: str | Path,
         config: TriggeredRunnerConfig,
         output_target_dir: str | Path | None = None,
+        epoch_preprocessor: Callable[[np.ndarray], np.ndarray] | None = None,
         assessor_writer: AssessorRatingWriter | None = None,
         monitor: RuntimeMonitorState | None = None,
     ) -> None:
@@ -66,6 +68,7 @@ class TriggeredReconstructionRunner:
         self.output_low_dir = Path(output_low_dir)
         self.output_meta_dir = Path(output_meta_dir)
         self.output_target_dir = None if output_target_dir is None else Path(output_target_dir)
+        self.epoch_preprocessor = epoch_preprocessor
         self.assessor_writer = assessor_writer
         self.monitor = monitor
         self.output_low_dir.mkdir(parents=True, exist_ok=True)
@@ -100,10 +103,10 @@ class TriggeredReconstructionRunner:
         self._stop_event.set()
 
     def run(self) -> int:
-        if self.epoch_samples != 1000:
+        if self.config.expected_epoch_samples is not None and self.epoch_samples != self.config.expected_epoch_samples:
             raise ValueError(
-                f"Triggered epoch resolves to {self.epoch_samples} samples. "
-                "The copied V1 models expect exactly 1000 EEG samples at 1000 Hz."
+                f"Triggered epoch resolves to {self.epoch_samples} samples, "
+                f"expected {self.config.expected_epoch_samples}."
             )
 
         if self.monitor is not None:
@@ -194,11 +197,15 @@ class TriggeredReconstructionRunner:
         start_lsl: float,
         end_lsl: float,
     ) -> None:
-        preprocessor = PreprocessingPipeline(
-            n_channels=self.config.eeg_channels,
-            sampling_rate=self.config.eeg_sampling_rate,
-        )
-        processed, is_valid = preprocessor.process(epoch)
+        if self.epoch_preprocessor is None:
+            preprocessor = PreprocessingPipeline(
+                n_channels=self.config.eeg_channels,
+                sampling_rate=self.config.eeg_sampling_rate,
+            )
+            processed, is_valid = preprocessor.process(epoch)
+        else:
+            processed = self.epoch_preprocessor(epoch)
+            is_valid = True
         stem = self._build_stem(event)
         parsed = parse_marker_payload(event.value)
         target = self.target_resolver.resolve(parsed)
@@ -211,6 +218,7 @@ class TriggeredReconstructionRunner:
             "epoch_start_lsl": start_lsl,
             "epoch_end_lsl": end_lsl,
             "epoch_samples": int(epoch.shape[1]),
+            "processed_shape": list(processed.shape),
             "artifact_valid": bool(is_valid),
             "image_id": parsed.image_id,
             "image_path": None if target is None else str(target.image_path),

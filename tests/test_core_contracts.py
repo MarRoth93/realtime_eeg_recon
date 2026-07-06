@@ -19,6 +19,14 @@ from maryam_rt.integration.resample import (
     starstim31_to_things63_torch,
 )
 from maryam_rt.integration.starstim31_atms import Starstim31ATMSEmbedder
+from maryam_rt.integration.starstim_preprocessing import (
+    StarstimLivePreprocessor,
+    average_reference,
+    baseline_correct,
+    crop_model_window,
+    resample_epoch,
+    select_starstim31_channels,
+)
 
 
 def test_marker_payload_accepts_plain_and_json() -> None:
@@ -82,6 +90,40 @@ def test_starstim32_native_drop_fz_downsamples_to_31_channels() -> None:
     torch.testing.assert_close(out, expected)
 
 
+def test_starstim_live_preprocessor_converts_500hz_starstim32_to_31x250() -> None:
+    samples = 600
+    common = np.linspace(-1.0, 1.0, samples, dtype=np.float32)
+    channel_offsets = np.arange(32, dtype=np.float32)[:, None]
+    raw = channel_offsets + common[None, :]
+
+    preprocessor = StarstimLivePreprocessor(input_sfreq=500.0, tmin=-0.2, tmax=1.0)
+    processed = preprocessor(raw)
+
+    assert processed.shape == (31, 250)
+    assert processed.dtype == np.float32
+    np.testing.assert_allclose(processed.mean(axis=0, dtype=np.float64), 0.0, atol=1e-4)
+
+
+def test_starstim_preprocessing_steps_match_offline_contract() -> None:
+    common = np.linspace(-0.5, 0.5, 600, dtype=np.float32)
+    raw = np.arange(32, dtype=np.float32)[:, None] * 0.01 + common[None, :]
+    selected = select_starstim31_channels(raw)
+    assert selected.shape == (31, 600)
+    np.testing.assert_allclose(selected[12], raw[13])
+
+    referenced = average_reference(selected)
+    np.testing.assert_allclose(referenced.mean(axis=0, dtype=np.float64), 0.0, atol=1e-4)
+
+    resampled = resample_epoch(referenced, input_sfreq=500.0, target_sfreq=250.0, duration_s=1.2)
+    assert resampled.shape == (31, 300)
+    times = -0.2 + np.arange(300, dtype=np.float32) / 250.0
+    corrected = baseline_correct(resampled, times, baseline=(-0.2, 0.0))
+    np.testing.assert_allclose(corrected[:, times < 0].mean(axis=1), 0.0, atol=1e-5)
+
+    cropped = crop_model_window(corrected, times)
+    assert cropped.shape == (31, 250)
+
+
 class _FakeATMSModel:
     def __call__(self, x: torch.Tensor, subject_ids: torch.Tensor) -> torch.Tensor:
         assert tuple(x.shape[1:]) == (31, 250)
@@ -102,4 +144,3 @@ def test_starstim31_atms_embedder_shape_contract_without_checkpoint() -> None:
         embedder.embed(np.zeros((31, 250), dtype=np.float32), subject_id=11)
     with pytest.raises(ValueError, match="Expected Starstim31 epoch"):
         embedder.embed(np.zeros((32, 250), dtype=np.float32), subject_id=4)
-

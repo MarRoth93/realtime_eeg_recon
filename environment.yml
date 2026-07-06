@@ -1,0 +1,38 @@
+# Recreate the local project environment:
+#   conda env create -f environment.yml
+#   conda activate BCI
+#
+# This is a practical environment spec, not a full lockfile. Model weights,
+# Hugging Face caches, lab data, and checkpoints remain local external assets.
+name: BCI
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip>=24
+  - numpy=1.26.4
+  - scipy
+  - scikit-learn
+  - mne
+  - mne-bids
+  - matplotlib
+  - pandas
+  - h5py
+  - pip:
+      # Matches the repaired working torch/vision stack in the current BCI env.
+      - --extra-index-url https://download.pytorch.org/whl/cu130
+      - torch==2.12.1+cu130
+      - torchvision==0.27.1+cu130
+
+      # Install this repo plus runtime, GUI, test, and optional full dependencies.
+      - -e .[dev,full]
+
+      # Extra packages present in the current BCI environment and useful for EEG work.
+      - braindecode==1.2.0
+      - opencv-python-headless==4.11.0.86
+      - pyxdf==1.16.8
+      - wfdb==4.3.1
+      - lpips==0.1.4
+      - pytorch-msssim==1.0.0
+      - torchmetrics==1.9.0

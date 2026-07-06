@@ -22,13 +22,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--eeg-stream-name", default="MockEEG", help="EEG LSL stream name.")
     parser.add_argument("--marker-stream-name", default="TaskMarkers", help="Marker LSL stream name.")
     parser.add_argument("--trigger-values", default="stim_onset", help="Comma-separated trigger marker names.")
-    parser.add_argument("--pre-event-ms", type=float, default=0.0, help="Milliseconds of EEG before the trigger.")
-    parser.add_argument("--post-event-ms", type=float, default=1000.0, help="Milliseconds of EEG after the trigger.")
+    parser.add_argument("--pre-event-ms", type=float, default=None, help="Milliseconds of EEG before the trigger. Defaults to 200 for native lab-live, otherwise 0.")
+    parser.add_argument("--post-event-ms", type=float, default=None, help="Milliseconds of EEG after the trigger. Defaults to 1000.")
     parser.add_argument("--trigger-cooldown-ms", type=float, default=0.0, help="Ignore triggers closer than this.")
     parser.add_argument("--poll-interval-ms", type=float, default=5.0, help="Polling interval for marker processing.")
     parser.add_argument("--ring-buffer-seconds", type=float, default=10.0, help="EEG ring buffer duration.")
     parser.add_argument("--image-root", default=None, help="Optional image root used to resolve image_id markers.")
-    parser.add_argument("--eeg-sampling-rate", type=float, default=1000.0, help="Incoming realtime EEG sampling rate.")
+    parser.add_argument("--eeg-sampling-rate", type=float, default=None, help="Incoming realtime EEG sampling rate. Defaults to 500 for native lab-live, otherwise 1000.")
 
     parser.add_argument(
         "--data-root",
@@ -74,7 +74,7 @@ def parse_args() -> argparse.Namespace:
         type=int,
         choices=[31, 32],
         default=None,
-        help="Native lab checkpoint channel count. Defaults to 32 for lab-live and 31 for lab-replay.",
+        help="Native lab checkpoint channel count. Defaults to 31 for native lab-live/lab-replay.",
     )
     parser.add_argument(
         "--lab-adapter",
@@ -122,16 +122,31 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def apply_mode_defaults(args: argparse.Namespace) -> None:
+    native_lab_live = args.mode == "lab-live" and args.lab_adapter == "none"
+    if args.eeg_sampling_rate is None:
+        args.eeg_sampling_rate = 500.0 if native_lab_live else 1000.0
+    if args.pre_event_ms is None:
+        args.pre_event_ms = 200.0 if native_lab_live else 0.0
+    if args.post_event_ms is None:
+        args.post_event_ms = 1000.0
+
+
 def validate_lab_args(args: argparse.Namespace) -> None:
     if args.enable_lab_atms_embedding and args.mode != "lab-replay":
         raise SystemExit("--enable-lab-atms-embedding is currently wired for --mode lab-replay.")
     if args.mode not in {"lab-live", "lab-replay"} or args.lab_adapter == "starstim31-to-things63":
         return
+    if args.mode == "lab-live" and args.lab_model_channels == 32:
+        raise SystemExit(
+            "Native lab-live uses the offline Starstim preprocessing path, which drops Fz and outputs "
+            "31 channels. Use a 31-channel native lab checkpoint."
+        )
     if args.lab_low_level_checkpoint is None:
         if args.mode == "lab-live":
             raise SystemExit(
-                "lab-live is native Starstim32 by default, but no native lab low-level checkpoint was given. "
-                "Pass --lab-low-level-checkpoint /path/to/checkpoint.pth for 32-channel reconstruction, "
+                "lab-live is native Starstim31 after offline-style preprocessing, but no native lab low-level "
+                "checkpoint was given. Pass --lab-low-level-checkpoint /path/to/checkpoint.pth, "
                 "or explicitly pass --lab-adapter starstim31-to-things63 to run the old THINGS63 compatibility path."
             )
         raise SystemExit(
@@ -150,6 +165,7 @@ def validate_lab_args(args: argparse.Namespace) -> None:
 
 def main() -> int:
     args = parse_args()
+    apply_mode_defaults(args)
     validate_lab_args(args)
 
     import uvicorn
@@ -159,7 +175,6 @@ def main() -> int:
     from maryam_rt.integration.low_level import (
         LowLevelEpochEncoder,
         LowLevelRealtimeEncoder,
-        LowLevelStarstimNativeRealtimeEncoder,
         LowLevelStarstimThingsAdapterRealtimeEncoder,
         LowLevelVAEDecoder,
     )
@@ -232,6 +247,8 @@ def main() -> int:
         worker.start()
 
     if args.mode in {"live", "lab-live"}:
+        epoch_preprocessor = None
+        expected_epoch_samples = 1000
         if args.mode == "lab-live":
             if args.lab_adapter == "starstim31-to-things63":
                 encoder = LowLevelStarstimThingsAdapterRealtimeEncoder(
@@ -239,12 +256,20 @@ def main() -> int:
                     device=args.device,
                 )
             else:
-                lab_model_channels = args.lab_model_channels or 32
-                encoder = LowLevelStarstimNativeRealtimeEncoder(
+                from maryam_rt.integration.starstim_preprocessing import StarstimLivePreprocessor
+
+                lab_model_channels = args.lab_model_channels or 31
+                encoder = LowLevelEpochEncoder(
                     checkpoint_path=args.lab_low_level_checkpoint,
                     device=args.device,
                     model_num_channels=lab_model_channels,
                 )
+                epoch_preprocessor = StarstimLivePreprocessor(
+                    input_sfreq=args.eeg_sampling_rate,
+                    tmin=-args.pre_event_ms / 1000.0,
+                    tmax=args.post_event_ms / 1000.0,
+                )
+                expected_epoch_samples = None
             eeg_channels = 32
         else:
             encoder = LowLevelRealtimeEncoder(
@@ -273,7 +298,9 @@ def main() -> int:
                 poll_interval_ms=args.poll_interval_ms,
                 ring_buffer_seconds=args.ring_buffer_seconds,
                 image_root=args.image_root,
+                expected_epoch_samples=expected_epoch_samples,
             ),
+            epoch_preprocessor=epoch_preprocessor,
         )
         controller = LiveController(runner=runner, monitor=monitor)
     elif args.mode == "things-replay":

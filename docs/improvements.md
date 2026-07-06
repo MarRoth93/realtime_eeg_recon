@@ -19,7 +19,10 @@ intentionally excluded here.
   `dev` and `full` optional dependency groups.
 - Done: montage constants are centralized and the GUI FastAPI app uses lifespan
   startup/shutdown handling.
-- Remaining: live preprocessing still needs training-time whitening parity once
+- Done: native `lab-live` now uses the offline-style Starstim epoch path:
+  32-channel raw epoch, drop `Fz`, average reference, resample to 250 Hz,
+  baseline-correct on `-200..0 ms`, and crop `0..1 s` to `31 x 250`.
+- Remaining: training-time whitening parity still needs a final decision once
   the native checkpoints are available; the assessor pipeline still depends on
   the timm CLIP ViT-L/14 backbone cache for fully offline inference; vendoring
   Plotly remains low priority if the rig must run fully air-gapped.
@@ -88,16 +91,15 @@ that are not required for the standard realtime GUI path.
 
 ## 5. Live path preprocessing does not match training
 
-`triggered_runner._run_inference` builds a fresh generic `PreprocessingPipeline`
-(z-score) per event, while the models were trained on MVNN-whitened data. This
-is documented in `docs/differences_offline_online.md` and is the change most
-likely to make live reconstructions look worse than offline.
+Native `lab-live` now bypasses the generic z-score `PreprocessingPipeline` and
+uses offline-style Starstim epoch preprocessing. The remaining mismatch is
+training-time whitening / MVNN parity. This is documented in
+`docs/differences_offline_online.md` and may still affect live reconstruction
+quality.
 
-Creating the pipeline fresh per event also means normalization has no
-warmup/history; if per-epoch stats are intentional, make that explicit.
-
-**Action:** port the training-time whitening into the live path (prioritize
-once the native checkpoints land); document the per-epoch normalization choice.
+**Remaining action:** decide whether the native Starstim checkpoints expect
+MVNN-whitened inputs, baseline-corrected inputs, or another training-time
+normalization, then make live and replay use the same choice.
 
 ## 6. Assessor self-containment and final summary artifact
 
