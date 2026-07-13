@@ -127,6 +127,8 @@ class TriggeredReconstructionRunner:
         self._seen_trial_ids: set[str] = set()
         self._experiment_started_at: float | None = None
         self._experiment_finished_at: float | None = None
+        self._preprocessor_source_labels: tuple[str, ...] | None = None
+        self._resolved_preprocessor: Callable[[np.ndarray], np.ndarray] | None = None
 
     @property
     def epoch_samples(self) -> int:
@@ -258,10 +260,12 @@ class TriggeredReconstructionRunner:
         buffer_ready = bool(format_valid and data_fresh and buffer_seconds >= self.config.min_buffer_seconds)
 
         if self.monitor is not None:
-            if (
-                self.config.expected_channel_labels
-                and self.eeg_inlet.channel_labels == self.config.expected_channel_labels
-            ):
+            expected_labels = self.config.expected_channel_labels
+            actual_labels = self.eeg_inlet.channel_labels
+            # Channel selection is name-based (see _resolve_epoch_preprocessor), so any
+            # ordering that carries the same labels is safe and can auto-confirm; the
+            # positional-fallback case (no/partial labels) still needs manual confirmation.
+            if expected_labels and actual_labels and set(actual_labels) == set(expected_labels):
                 self.monitor.confirm_channel_order(True)
             self.monitor.set_stream_health(
                 eeg_connected=eeg_connected,
@@ -619,6 +623,43 @@ class TriggeredReconstructionRunner:
         })
         summary_path.write_text(json.dumps(summary, indent=2))
 
+    def _resolve_epoch_preprocessor(self) -> Callable[[np.ndarray], np.ndarray]:
+        """Bind the live stream's advertised channel labels to the Starstim preprocessor.
+
+        Mirrors the lab-replay path, which selects channels by name from the recording's
+        ``.info`` order. Here the LSL stream's declared labels drive channel selection so it
+        is order-independent, falling back to the montage default when the stream omits
+        labels or does not carry all model channels.
+        """
+        preprocessor = self.epoch_preprocessor
+        assert preprocessor is not None
+        from maryam_rt.integration.starstim_preprocessing import StarstimLivePreprocessor
+
+        if not isinstance(preprocessor, StarstimLivePreprocessor):
+            return preprocessor
+
+        labels = self.eeg_inlet.channel_labels
+        if labels == self._preprocessor_source_labels and self._resolved_preprocessor is not None:
+            return self._resolved_preprocessor
+
+        self._preprocessor_source_labels = labels
+        resolved = preprocessor
+        if self._labels_cover_model(labels, len(preprocessor.ch_names)) and tuple(labels) != preprocessor.ch_names:
+            resolved = replace(preprocessor, ch_names=tuple(labels))
+        self._resolved_preprocessor = resolved
+        return resolved
+
+    @staticmethod
+    def _labels_cover_model(labels: tuple[str, ...], expected_count: int) -> bool:
+        """True when stream labels can drive name-based Starstim31 selection."""
+        from maryam_rt.integration.montage import STARSTIM_31_CHANNELS
+
+        return (
+            bool(labels)
+            and len(labels) == expected_count
+            and set(STARSTIM_31_CHANNELS).issubset(labels)
+        )
+
     def _run_inference(
         self,
         event: MarkerEvent,
@@ -634,7 +675,7 @@ class TriggeredReconstructionRunner:
             )
             processed, is_valid = preprocessor.process(epoch)
         else:
-            processed = self.epoch_preprocessor(epoch)
+            processed = self._resolve_epoch_preprocessor()(epoch)
             is_valid = True
         stem = self._build_stem(event)
         parsed = payload

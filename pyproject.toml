@@ -9,10 +9,15 @@ description = "Realtime EEG-to-image reconstruction runtime and browser monitor.
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "numpy",
+    # Pinned to match the conda BCI env (environment.yml).
+    "numpy==1.26.4",
     "scipy",
-    "torch",
-    "torchvision",
+    "scikit-learn",
+    "pandas",
+    "h5py",
+    "matplotlib",
+    "torch==2.12.1+cu130",
+    "torchvision==0.27.1+cu130",
     "timm>=1.0",
     "pylsl",
     "mne",
@@ -36,11 +41,36 @@ dev = [
 full = [
     "mne-bids",
     "onnx",
-    "onnxruntime",
+    "onnxruntime<1.24",  # 1.24+ dropped cp310 wheels; we target Python 3.10
     "onnxsim",
     "open_clip_torch>=2.20.0",
     "openneuro-py",
 ]
+# Extra EEG/vision packages present in the conda BCI env (environment.yml pip: block).
+lab = [
+    "braindecode==1.2.0",
+    "opencv-python-headless==4.11.0.86",
+    "pyxdf==1.16.8",
+    "wfdb==4.3.1",
+    "lpips==0.1.4",
+    "pytorch-msssim==1.0.0",
+    "torchmetrics==1.9.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+# --- uv configuration -------------------------------------------------------
+# Recreate the environment with:
+#   uv sync --all-extras
+# (analogous to `conda env create -f environment.yml && conda activate BCI`).
+# This installs the project (editable) plus the dev, full, and lab extras into
+# a local .venv/. torch/torchvision are pulled from the CUDA 13.0 wheel index.
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu130" }
+torchvision = { index = "pytorch-cu130" }
