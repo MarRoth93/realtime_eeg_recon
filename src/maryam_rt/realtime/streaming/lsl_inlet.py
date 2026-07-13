@@ -5,10 +5,16 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 
 import numpy as np
-from pylsl import StreamInfo, StreamInlet, resolve_streams
+
+try:
+    from pylsl import StreamInfo, StreamInlet, resolve_streams
+except ModuleNotFoundError:  # Allows buffer/lifecycle tests in a minimal environment.
+    StreamInfo = Any  # type: ignore[misc,assignment]
+    StreamInlet = None  # type: ignore[assignment]
+    resolve_streams = None  # type: ignore[assignment]
 
 from .timestamp_sync import TimestampSyncConfig, TimestampSynchronizer
 
@@ -162,7 +168,15 @@ class LSLInletWrapper:
         self._ring: Optional[RingBuffer] = None
         self._channel_count: Optional[int] = config.channel_count
         self._sampling_rate: Optional[float] = config.sampling_rate
+        self._nominal_sampling_rate: Optional[float] = None
+        self._stream_name: Optional[str] = None
+        self._stream_type: Optional[str] = None
+        self._source_id: Optional[str] = None
+        self._channel_labels: tuple[str, ...] = ()
         self._last_lsl_timestamp: Optional[float] = None
+        self._last_sample_monotonic: Optional[float] = None
+        self._connection_generation = 0
+        self._timestamp_gap_count = 0
         self._last_error: Optional[Exception] = None
         self._timestamp_sync: Optional[TimestampSynchronizer] = None
         self._last_time_sync_update = 0.0
@@ -189,6 +203,51 @@ class LSLInletWrapper:
     def sampling_rate(self) -> Optional[float]:
         """Nominal sampling rate for the stream."""
         return self._sampling_rate
+
+    @property
+    def nominal_sampling_rate(self) -> Optional[float]:
+        """Sampling rate reported by the connected LSL stream."""
+        return self._nominal_sampling_rate
+
+    @property
+    def stream_name(self) -> Optional[str]:
+        return self._stream_name
+
+    @property
+    def stream_type(self) -> Optional[str]:
+        return self._stream_type
+
+    @property
+    def source_id(self) -> Optional[str]:
+        return self._source_id
+
+    @property
+    def channel_labels(self) -> tuple[str, ...]:
+        return self._channel_labels
+
+    @property
+    def buffer_seconds(self) -> float:
+        rate = self._sampling_rate
+        if rate is None or rate <= 0:
+            return 0.0
+        return self.available_samples / rate
+
+    @property
+    def last_sample_age_seconds(self) -> Optional[float]:
+        with self._lock:
+            if self._last_sample_monotonic is None:
+                return None
+            return max(time.monotonic() - self._last_sample_monotonic, 0.0)
+
+    @property
+    def connection_generation(self) -> int:
+        with self._lock:
+            return self._connection_generation
+
+    @property
+    def timestamp_gap_count(self) -> int:
+        with self._lock:
+            return self._timestamp_gap_count
 
     @property
     def is_connected(self) -> bool:
@@ -338,6 +397,8 @@ class LSLInletWrapper:
                     self._inlet = self._create_inlet(info)
                     self._info = info
                     self._last_error = None
+                    with self._lock:
+                        self._connection_generation += 1
                     self._connected_event.set()
                     last_sample_time = time.monotonic()
                 except Exception as exc:
@@ -361,6 +422,8 @@ class LSLInletWrapper:
                 time.sleep(self._config.reconnect_interval)
 
     def _resolve_stream_info(self) -> Optional[StreamInfo]:
+        if resolve_streams is None:
+            raise RuntimeError("pylsl is required for live EEG streaming.")
         infos = resolve_streams(wait_time=self._config.resolve_timeout)
 
         if not infos:
@@ -389,12 +452,18 @@ class LSLInletWrapper:
                 f"Stream has {channel_count} channels but {self._channel_count} expected."
             )
 
-        sampling_rate = self._sampling_rate or float(info.nominal_srate())
+        nominal_sampling_rate = float(info.nominal_srate())
+        sampling_rate = self._sampling_rate or nominal_sampling_rate
         if sampling_rate <= 0:
             raise ValueError(
                 "sampling_rate must be provided for irregular streams with nominal_srate=0."
             )
         self._sampling_rate = sampling_rate
+        self._nominal_sampling_rate = nominal_sampling_rate
+        self._stream_name = str(info.name())
+        self._stream_type = str(info.type())
+        self._source_id = str(info.source_id())
+        self._channel_labels = self._read_channel_labels(info)
         capacity = max(
             self._config.chunk_size, int(round(self._sampling_rate * self._config.ring_buffer_seconds))
         )
@@ -402,7 +471,26 @@ class LSLInletWrapper:
             self._ring = RingBuffer(channel_count, capacity, dtype=self._config.dtype)
             self._data_ready.notify_all()
 
+    @staticmethod
+    def _read_channel_labels(info: StreamInfo) -> tuple[str, ...]:
+        labels: list[str] = []
+        try:
+            desc = info.desc()
+            channel = desc.child("channels").child("channel")
+            if not (channel.child_value("label") or channel.child_value("name")):
+                channel = desc.child("channel")
+            for _ in range(int(info.channel_count())):
+                label = channel.child_value("label") or channel.child_value("name")
+                if label:
+                    labels.append(str(label))
+                channel = channel.next_sibling()
+        except Exception:
+            return ()
+        return tuple(labels)
+
     def _create_inlet(self, info: StreamInfo) -> StreamInlet:
+        if StreamInlet is None:
+            raise RuntimeError("pylsl is required for live EEG streaming.")
         kwargs = {
             "max_buflen": int(self._config.max_lsl_buffer_seconds),
             "max_chunklen": self._config.chunk_size,
@@ -426,15 +514,37 @@ class LSLInletWrapper:
         samples, timestamps = self._pull_chunk(self._config.pull_timeout)
         if not samples:
             return False
+        self._reset_for_timestamp_gap(timestamps)
         self._append_samples(samples)
         self._update_time_sync(timestamps)
         while True:
             extra_samples, extra_timestamps = self._pull_chunk(0.0)
             if not extra_samples:
                 break
+            self._reset_for_timestamp_gap(extra_timestamps)
             self._append_samples(extra_samples)
             self._update_time_sync(extra_timestamps)
         return True
+
+    def _reset_for_timestamp_gap(self, timestamps: Sequence[float]) -> None:
+        if not timestamps or self._sampling_rate is None or self._sampling_rate <= 0:
+            return
+        with self._lock:
+            previous = self._last_lsl_timestamp
+        if previous is None:
+            return
+        first = float(timestamps[0])
+        threshold = max(5.0 / self._sampling_rate, 0.05)
+        if first > previous and (first - previous) <= threshold:
+            return
+        with self._data_ready:
+            if self._ring is not None:
+                self._ring.clear()
+            self._data_ready.notify_all()
+        with self._lock:
+            self._connection_generation += 1
+            self._timestamp_gap_count += 1
+            self._last_lsl_timestamp = None
 
     def _pull_chunk(
         self, timeout: float
@@ -450,6 +560,7 @@ class LSLInletWrapper:
         if timestamps:
             with self._lock:
                 self._last_lsl_timestamp = float(timestamps[-1])
+                self._last_sample_monotonic = time.monotonic()
         if self._timestamp_sync is None:
             return
         self._timestamp_sync.update_local_alignment()
@@ -502,6 +613,7 @@ class LSLInletWrapper:
         self._connected_event.clear()
         with self._lock:
             self._last_lsl_timestamp = None
+            self._last_sample_monotonic = None
         if self._timestamp_sync is not None:
             self._timestamp_sync.reset()
             self._last_time_sync_update = 0.0

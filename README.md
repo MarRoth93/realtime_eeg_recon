@@ -38,6 +38,8 @@ Expected local assets:
 checkpoints/
   hierarchical/
     atms_starstim31_10sub_best.pth
+    lab_low_level_starstim31_best.pth
+    lab_prior_starstim31_best_fdn.pt
     low_level_encoder_sub01_60.pth
     atms_sub01_40.pth
     prior_sub01_fdn.pt
@@ -47,6 +49,9 @@ checkpoints/
 data/
   derived/
     lab_starstim31_epochs_250hz.npz
+    live_preproc/
+      lab_starstim31_epochs_250hz.npz
+      lab_finetune_split_manifest.tsv
     finetune/
       lab_finetune_split_manifest.tsv
       lab_target_manifest.tsv
@@ -62,7 +67,7 @@ use.
 Use `scripts/run_realtime_gui.py` for the browser monitor. It supports:
 
 - `things-replay`: replays THINGS raw EEG from disk using true `stim` channel events.
-- `lab-replay`: replays derived Starstim31 lab epochs from `data/derived`.
+- `lab-replay`: replays Starstim lab recordings from raw `.easy` files by default, using the same preprocessing contract as `lab-live`.
 - `live`: reads EEG and marker LSL streams.
 - `lab-live`: reads Starstim-style live EEG and marker LSL streams.
 
@@ -113,12 +118,19 @@ background. That path requires the high-level checkpoint stack and SDXL assets.
 
 ## Lab Replay
 
+By default, lab replay re-extracts raw Starstim32 epochs from each subject's
+`.easy` file, then runs the same live preprocessing used by `lab-live`: drop
+`Fz`, average reference, resample to 250 Hz, baseline-correct, and crop the
+model-facing `31 x 250` window. The cached derived epoch file can still be used
+for debugging with `--lab-replay-source derived` or `--replay-source derived`.
+
 Low-level only:
 
 ```bash
 conda activate BCI
 python scripts/run_realtime_gui.py \
   --mode lab-replay \
+  --lab-replay-source raw \
   --lab-data-root data \
   --lab-subject P07 \
   --lab-split all \
@@ -135,6 +147,7 @@ Direct non-GUI replay:
 
 ```bash
 python scripts/run_lab_replay.py \
+  --replay-source raw \
   --data-root data \
   --subject P07 \
   --split all \
@@ -147,8 +160,30 @@ python scripts/run_lab_replay.py \
 Notes:
 
 - The default lab adapter is `none`; lab epochs stay Starstim31 native.
-- The current derived lab epoch file is shaped `(N, 31, 250)` because preprocessing drops `Fz`.
+- Raw lab replay and live mode both produce `(31, 250)` model epochs with the shared live preprocessing path.
+- The derived lab epoch file remains available as a cache/debug source with `--replay-source derived`.
+- Native lab high-level needs `--lab-prior-checkpoint` and uses the Starstim31 ATMS checkpoint.
+- For P07 high-level refinement, pass `--subject-id 4` so the ATMS subject conditioning matches the lab manifest.
 - For an explicit old THINGS63 compatibility run, pass `--lab-adapter starstim31-to-things63`.
+
+Native low-level plus native high-level:
+
+```bash
+python scripts/run_realtime_gui.py \
+  --mode lab-replay \
+  --lab-replay-source raw \
+  --lab-data-root data \
+  --lab-subject P07 \
+  --lab-split all \
+  --lab-low-level-checkpoint checkpoints/hierarchical/lab_low_level_starstim31_best.pth \
+  --lab-prior-checkpoint checkpoints/hierarchical/lab_prior_starstim31_best_fdn.pt \
+  --lab-model-channels 31 \
+  --subject-id 4 \
+  --max-trials 30 \
+  --sleep-seconds 1.0 \
+  --host 127.0.0.1 \
+  --port 8010
+```
 
 ## Starstim31 ATMS Embeddings
 
@@ -156,6 +191,7 @@ Lab replay can export Starstim31 ATMS EEG embeddings:
 
 ```bash
 python scripts/run_lab_replay.py \
+  --replay-source raw \
   --data-root data \
   --subject P07 \
   --split all \
@@ -169,6 +205,50 @@ Embeddings are written to:
 
 ```text
 outputs/<run_name>/embeddings/*_starstim31_atms.pt
+```
+
+## Training Lab-Native Checkpoints
+
+The lab-native low-level and prior checkpoints are trained in the reconstruction
+repo:
+
+```bash
+cd /home/psycontrol/Marco/Maryam/Hierarchical_EEG2Image_Reconstruction
+```
+
+Build the raw/live-style lab training cache first:
+
+```bash
+/home/psycontrol/miniforge3/envs/BCI/bin/python scripts/build_lab_live_preproc_cache.py
+```
+
+Train the Starstim31 low-level VAE-latent encoder:
+
+```bash
+/home/psycontrol/miniforge3/envs/BCI/bin/python scripts/train_lab_low_level_vae.py \
+  --experiment-name starstim31_livepreproc_sdxlvae \
+  --heldout-subject P07 \
+  --device cuda:0
+```
+
+Train the Starstim31-conditioned diffusion prior:
+
+```bash
+/home/psycontrol/miniforge3/envs/BCI/bin/python scripts/train_lab_diffusion_prior.py \
+  --experiment-name starstim31_livepreproc_fdn \
+  --heldout-subject P07 \
+  --device cuda:0
+```
+
+With `--heldout-subject P07`, training uses all usable non-P07 lab trials and
+evaluation uses usable P07 trials. Omit the flag only for a calibrated
+multi-subject model where P07 is allowed to contribute training data.
+
+Expected outputs:
+
+```text
+models/lab_low_level/starstim31_livepreproc/best.pth
+models/lab_prior/starstim31_livepreproc/lab_prior_best_fdn.pt
 ```
 
 ## Assessor Ratings
@@ -227,33 +307,26 @@ Markers can be plain strings or JSON payloads with `event`, `image_id`, or
 
 ## Lab Live Mode
 
-Use this for Starstim-style 32-channel live EEG. Native `lab-live` applies the
-same model-facing preprocessing as the offline lab extraction: raw 32-channel
-Starstim epoch, drop `Fz`, average reference, resample to 250 Hz,
-baseline-correct on `-200..0 ms`, then crop `0..1 s` to `31 x 250`.
-
-First confirm the LSL stream names exposed by NIC2 and the marker source:
+For the new-participant demo, use the one-command launcher:
 
 ```bash
-python scripts/list_lsl_streams.py
+./scripts/start_live_demo.sh
 ```
 
-Use the reported EEG stream name for `--eeg-stream-name`. The marker stream
-must emit `stim_onset` or JSON payloads with an `event` field.
+It opens an interactive setup page that discovers LSL devices, validates the
+32-channel/500 Hz Starstim stream, waits for a warmed EEG buffer, asks the
+operator to confirm channel order, and exposes explicit Connect, Retry, Arm,
+Disarm, Stop, and Disconnect controls. The runner waits for late equipment
+instead of failing after ten seconds.
 
-```bash
-python scripts/run_realtime_gui.py \
-  --mode lab-live \
-  --eeg-stream-name StarstimEEG \
-  --marker-stream-name TaskMarkers \
-  --trigger-values stim_onset \
-  --lab-low-level-checkpoint /path/to/starstim31_low_level.pth \
-  --lab-model-channels 31 \
-  --image-root /path/to/object_images \
-  --disable-high-level \
-  --host 127.0.0.1 \
-  --port 8010
-```
+The launcher reads `config/lab_demo.json`. By default it uses the native plain
+Starstim31 low-level checkpoint and treats the participant as unseen, so no
+P07/known-subject ID is reused. Experimental high-level shared conditioning can
+be enabled explicitly in that configuration.
+
+Native `lab-live` applies the same model-facing preprocessing as raw replay:
+drop `Fz`, average-reference, resample to 250 Hz, baseline-correct on
+`-200..0 ms`, and crop `0..1 s` to `31 x 250`.
 
 Native `lab-live` defaults to `--eeg-sampling-rate 500`, `--pre-event-ms 200`,
 and `--post-event-ms 1000`. Override those only if the NIC2 LSL stream is
@@ -268,8 +341,5 @@ PO3, O1, Oz, O2, PO4, Pz, CP1, FC1,
 P3, C3, F3, F7, FC5, CP5, T7, P7
 ```
 
-## Current Blockers
-
-See `docs/lab_realtime_pipeline_status.md` for the current lab pipeline status.
-The project still needs a native Starstim31 low-level checkpoint and a
-Starstim31-compatible diffusion prior before the lab GUI can run end to end.
+The complete setup sequence, marker contract, recovery behavior, model policy,
+and hardware rehearsal are in `docs/live_demo_operator_guide.md`.

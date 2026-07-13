@@ -12,9 +12,12 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 def _channel_labels(info) -> list[str]:
     labels: list[str] = []
     try:
-        channels = info.desc().child("channels").child("channel")
+        desc = info.desc()
+        channels = desc.child("channels").child("channel")
+        if not (channels.child_value("label") or channels.child_value("name")):
+            channels = desc.child("channel")
         for _ in range(info.channel_count()):
-            label = channels.child_value("label")
+            label = channels.child_value("label") or channels.child_value("name")
             if label:
                 labels.append(label)
             channels = channels.next_sibling()

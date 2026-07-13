@@ -2,7 +2,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
+import threading
+import time
+import webbrowser
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -16,14 +20,59 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=8000, help="Bind port for the local web app.")
     parser.add_argument("--device", default="cuda", help="Torch device.")
     parser.add_argument("--disable-high-level", action="store_true", help="Run only the low-level direct path.")
-    parser.add_argument("--subject-id", type=int, default=0, help="ATMS subject id.")
+    parser.add_argument("--subject-id", type=int, default=None, help="Known-participant ATMS subject id.")
     parser.add_argument("--text-prompt", default="a photo of an object", help="Prompt for slow refinement.")
+    parser.add_argument("--participant-code", default="unseen-demo", help="Anonymous code stored with live outputs.")
+    parser.add_argument(
+        "--participant-mode",
+        choices=["auto", "known", "unseen"],
+        default="auto",
+        help="Use unseen for a participant who has no trained checkpoint row.",
+    )
+    parser.add_argument(
+        "--enable-experimental-unseen-high-level",
+        action="store_true",
+        help="Use the ATMS checkpoint's trained shared token for experimental high-level output.",
+    )
+    parser.add_argument("--session-id", default=None, help="Live session identifier. Defaults to a timestamped ID.")
+    parser.add_argument("--output-root", type=Path, default=None, help="Optional output directory override.")
+    parser.add_argument("--open-browser", action="store_true", help="Open the local GUI after the server starts.")
+    parser.add_argument(
+        "--auto-connect",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Connect immediately instead of showing the live setup screen first.",
+    )
 
-    parser.add_argument("--eeg-stream-name", default="MockEEG", help="EEG LSL stream name.")
-    parser.add_argument("--marker-stream-name", default="TaskMarkers", help="Marker LSL stream name.")
+    parser.add_argument("--eeg-stream-name", default=None, help="Preferred EEG LSL stream name.")
+    parser.add_argument("--marker-stream-name", default=None, help="Preferred marker LSL stream name.")
+    parser.add_argument("--eeg-source-id", default=None, help="Optional exact EEG LSL source_id.")
+    parser.add_argument("--marker-source-id", default=None, help="Optional exact marker LSL source_id.")
     parser.add_argument("--trigger-values", default="stim_onset", help="Comma-separated trigger marker names.")
+    parser.add_argument("--experiment-start-values", default="experiment_start", help="Comma-separated experiment-start markers.")
+    parser.add_argument("--experiment-pause-values", default="experiment_pause", help="Comma-separated experiment-pause markers.")
+    parser.add_argument("--experiment-resume-values", default="experiment_resume", help="Comma-separated experiment-resume markers.")
+    parser.add_argument("--experiment-end-values", default="experiment_end", help="Comma-separated experiment-end markers.")
+    parser.add_argument("--marker-test-values", default="marker_test", help="Comma-separated setup marker-test values.")
+    parser.add_argument("--heartbeat-values", default="heartbeat", help="Comma-separated marker heartbeat values.")
+    parser.add_argument("--marker-heartbeat-timeout-seconds", type=float, default=None, help="Require periodic marker heartbeat samples within this interval.")
+    parser.add_argument("--marker-test-required", action="store_true", help="Require marker_test before Arm is enabled.")
+    parser.add_argument(
+        "--legacy-start-on-first-trigger",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Allow the first whitelisted legacy numeric trigger to start an armed session.",
+    )
+    parser.add_argument(
+        "--live-trigger-map",
+        type=Path,
+        default=None,
+        help="TSV or JSON whitelist mapping legacy numeric markers to live targets.",
+    )
     parser.add_argument("--pre-event-ms", type=float, default=None, help="Milliseconds of EEG before the trigger. Defaults to 200 for native lab-live, otherwise 0.")
     parser.add_argument("--post-event-ms", type=float, default=None, help="Milliseconds of EEG after the trigger. Defaults to 1000.")
+    parser.add_argument("--min-buffer-seconds", type=float, default=1.0, help="EEG required before Arm becomes available.")
+    parser.add_argument("--post-event-timeout-seconds", type=float, default=3.0, help="Drop a trial if post-event EEG does not arrive in time.")
     parser.add_argument("--trigger-cooldown-ms", type=float, default=0.0, help="Ignore triggers closer than this.")
     parser.add_argument("--poll-interval-ms", type=float, default=5.0, help="Polling interval for marker processing.")
     parser.add_argument("--ring-buffer-seconds", type=float, default=10.0, help="EEG ring buffer duration.")
@@ -56,13 +105,42 @@ def parse_args() -> argparse.Namespace:
         "--lab-data-root",
         type=Path,
         default=PROJECT_ROOT / "data",
-        help="Root containing lab derived artifacts, usually data/derived/...",
+        help="Root containing lab raw subject folders and derived artifacts.",
+    )
+    parser.add_argument(
+        "--lab-replay-source",
+        choices=["raw", "derived"],
+        default="raw",
+        help="raw re-extracts .easy epochs with the lab-live preprocessor; derived uses cached 31x250 epochs.",
     )
     parser.add_argument("--lab-epoch-npz", type=Path, default=None, help="Optional lab epoch npz override.")
     parser.add_argument("--lab-target-manifest", type=Path, default=None, help="Optional lab target manifest override.")
     parser.add_argument("--lab-split-manifest", type=Path, default=None, help="Optional lab split manifest override.")
     parser.add_argument("--lab-split", choices=["all", "train", "val"], default="all", help="Lab split to replay.")
     parser.add_argument("--lab-subject", default=None, help="Optional lab subject folder to replay, e.g. P06 or zar.")
+    parser.add_argument(
+        "--lab-whitening",
+        choices=["none", "mvnn"],
+        default="none",
+        help="Optional lab replay whitening applied to the model input. Use mvnn for train-split MVNN.",
+    )
+    parser.add_argument(
+        "--lab-whitening-split",
+        choices=["all", "train", "val"],
+        default="train",
+        help="Lab split used to compute the MVNN whitener.",
+    )
+    parser.add_argument(
+        "--lab-whitening-cache",
+        type=Path,
+        default=None,
+        help="Optional .npy path for loading/saving the lab MVNN whitening matrix.",
+    )
+    parser.add_argument(
+        "--lab-whitening-subject",
+        default=None,
+        help="Optional subject folder used to compute the whitener. Defaults to --lab-subject.",
+    )
     parser.add_argument(
         "--lab-low-level-checkpoint",
         type=Path,
@@ -75,6 +153,24 @@ def parse_args() -> argparse.Namespace:
         choices=[31, 32],
         default=None,
         help="Native lab checkpoint channel count. Defaults to 31 for native lab-live/lab-replay.",
+    )
+    parser.add_argument(
+        "--lab-low-level-arch",
+        choices=["plain", "transformed"],
+        default="plain",
+        help="Low-level checkpoint architecture. Use transformed for custom encoder_low_level_transformed checkpoints.",
+    )
+    parser.add_argument(
+        "--lab-low-level-subject-id",
+        type=int,
+        default=None,
+        help="Subject id for transformed low-level checkpoints. Lab replay defaults to the manifest lab_subject_id.",
+    )
+    parser.add_argument(
+        "--low-level-latent-scaling",
+        choices=["auto", "direct", "sdxl"],
+        default="auto",
+        help="How to decode low-level latents. auto uses SDXL scaling for transformed lab checkpoints.",
     )
     parser.add_argument(
         "--lab-adapter",
@@ -92,6 +188,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=PROJECT_ROOT / "checkpoints" / "hierarchical" / "atms_starstim31_10sub_best.pth",
         help="Starstim31 ATMS checkpoint used when --enable-lab-atms-embedding is set.",
+    )
+    parser.add_argument(
+        "--lab-prior-checkpoint",
+        type=Path,
+        default=None,
+        help="Native lab diffusion prior checkpoint for high-level refinement in lab-live/lab-replay.",
     )
     parser.add_argument(
         "--lab-atms-subject-id",
@@ -124,17 +226,47 @@ def parse_args() -> argparse.Namespace:
 
 def apply_mode_defaults(args: argparse.Namespace) -> None:
     native_lab_live = args.mode == "lab-live" and args.lab_adapter == "none"
+    raw_lab_replay = args.mode == "lab-replay" and args.lab_replay_source == "raw"
     if args.eeg_sampling_rate is None:
-        args.eeg_sampling_rate = 500.0 if native_lab_live else 1000.0
+        args.eeg_sampling_rate = 500.0 if native_lab_live or raw_lab_replay else 1000.0
     if args.pre_event_ms is None:
-        args.pre_event_ms = 200.0 if native_lab_live else 0.0
+        args.pre_event_ms = 200.0 if native_lab_live or raw_lab_replay else 0.0
     if args.post_event_ms is None:
         args.post_event_ms = 1000.0
+    if args.participant_mode == "auto":
+        args.participant_mode = "unseen" if args.mode == "lab-live" else "known"
+    if args.subject_id is None and args.participant_mode == "known":
+        args.subject_id = 0
+    if args.eeg_stream_name is None:
+        args.eeg_stream_name = "eeg_recon_pyexp-EEG" if args.mode == "lab-live" else "MockEEG"
+    if args.marker_stream_name is None:
+        args.marker_stream_name = "eeg_recon_pyexp" if args.mode == "lab-live" else "TaskMarkers"
+    if args.auto_connect is None:
+        args.auto_connect = args.mode != "lab-live"
+    if args.legacy_start_on_first_trigger is None:
+        args.legacy_start_on_first_trigger = args.mode == "lab-live"
+    if args.live_trigger_map is None and args.mode == "lab-live":
+        args.live_trigger_map = PROJECT_ROOT / "data" / "derived" / "finetune" / "lab_target_manifest.tsv"
+    if args.session_id is None and args.mode in {"live", "lab-live"}:
+        args.session_id = f"{time.strftime('%Y%m%d_%H%M%S')}_live"
+
+    if args.mode == "lab-live" and args.participant_mode == "unseen":
+        if args.lab_low_level_arch == "transformed":
+            raise SystemExit(
+                "A transformed low-level checkpoint needs a trained participant row. "
+                "Use --lab-low-level-arch plain for an unseen live participant."
+            )
+        if not args.enable_experimental_unseen_high_level:
+            args.disable_high_level = True
 
 
 def validate_lab_args(args: argparse.Namespace) -> None:
     if args.enable_lab_atms_embedding and args.mode != "lab-replay":
         raise SystemExit("--enable-lab-atms-embedding is currently wired for --mode lab-replay.")
+    if args.lab_whitening != "none" and args.mode != "lab-replay":
+        raise SystemExit("--lab-whitening is currently wired for --mode lab-replay.")
+    if args.lab_whitening != "none" and args.lab_adapter != "none":
+        raise SystemExit("--lab-whitening mvnn is only supported with --lab-adapter none.")
     if args.mode not in {"lab-live", "lab-replay"} or args.lab_adapter == "starstim31-to-things63":
         return
     if args.mode == "lab-live" and args.lab_model_channels == 32:
@@ -142,6 +274,8 @@ def validate_lab_args(args: argparse.Namespace) -> None:
             "Native lab-live uses the offline Starstim preprocessing path, which drops Fz and outputs "
             "31 channels. Use a 31-channel native lab checkpoint."
         )
+    if args.lab_low_level_arch == "transformed" and args.lab_model_channels == 32:
+        raise SystemExit("Transformed lab low-level checkpoints are currently supported only for 31-channel epochs.")
     if args.lab_low_level_checkpoint is None:
         if args.mode == "lab-live":
             raise SystemExit(
@@ -151,19 +285,19 @@ def validate_lab_args(args: argparse.Namespace) -> None:
             )
         raise SystemExit(
             "lab-replay is native Starstim by default, but no native lab low-level checkpoint was given. "
-            "The current derived lab epoch file is 31-channel because preprocessing drops Fz. "
+            "Raw and derived lab replay both produce 31-channel model epochs because preprocessing drops Fz. "
             "Pass --lab-low-level-checkpoint /path/to/checkpoint.pth, or explicitly pass "
             "--lab-adapter starstim31-to-things63 to run the old THINGS63 compatibility path."
         )
     if not args.disable_high_level:
-        raise SystemExit(
-            "Native lab low-level mode is configured, but the high-level ATMS wrapper still defaults to the "
-            "THINGS63 checkpoint. Pass --disable-high-level for native lab low-level replay/live mode, or use "
-            "--lab-adapter starstim31-to-things63 for the existing compatibility stack."
-        )
+        if args.lab_prior_checkpoint is None:
+            raise SystemExit(
+                "Native lab high-level mode needs a lab diffusion prior. Pass "
+                "--lab-prior-checkpoint /path/to/lab_prior_best_fdn.pt, or pass --disable-high-level."
+            )
 
 
-def main() -> int:
+def _run_main() -> int:
     args = parse_args()
     apply_mode_defaults(args)
     validate_lab_args(args)
@@ -176,6 +310,7 @@ def main() -> int:
         LowLevelEpochEncoder,
         LowLevelRealtimeEncoder,
         LowLevelStarstimThingsAdapterRealtimeEncoder,
+        LowLevelTransformedEpochEncoder,
         LowLevelVAEDecoder,
     )
     from maryam_rt.integration.lab_replay import LabReplayConfig, LabReplayRunner
@@ -193,16 +328,74 @@ def main() -> int:
         "things-replay": "gui_things_replay",
         "lab-replay": "gui_lab_replay",
     }[args.mode]
-    output_root = PROJECT_ROOT / "outputs" / output_name
+    if args.output_root is not None:
+        output_root = args.output_root.expanduser()
+        if not output_root.is_absolute():
+            output_root = PROJECT_ROOT / output_root
+    elif args.mode in {"live", "lab-live"}:
+        output_root = PROJECT_ROOT / "outputs" / output_name / "sessions" / str(args.session_id)
+    else:
+        output_root = PROJECT_ROOT / "outputs" / output_name
     output_low = output_root / "low_level"
     output_high = output_root / "high_level"
     output_meta = output_root / "events"
     output_targets = output_root / "targets"
     for directory in [output_low, output_high, output_meta, output_targets]:
         directory.mkdir(parents=True, exist_ok=True)
+    output_probe = output_root / ".write_probe"
+    output_writable = False
+    try:
+        output_probe.write_text("ok")
+        output_probe.unlink()
+        output_writable = True
+    except OSError:
+        output_writable = False
+    if args.mode in {"live", "lab-live"}:
+        (output_root / "session.json").write_text(
+            json.dumps(
+                {
+                    "session_id": args.session_id,
+                    "participant_code": args.participant_code,
+                    "participant_mode": args.participant_mode,
+                    "mode": args.mode,
+                    "lifecycle_status": "loading_models",
+                    "created_at": time.time(),
+                    "output_root": str(output_root),
+                    "preferred_eeg_stream": args.eeg_stream_name,
+                    "preferred_marker_stream": args.marker_stream_name,
+                },
+                indent=2,
+            )
+        )
 
-    monitor = RuntimeMonitorState(mode=args.mode, high_level_enabled=not args.disable_high_level)
-    decoder = LowLevelVAEDecoder(device=args.device)
+    high_level_reason = None
+    if args.mode == "lab-live" and args.participant_mode == "unseen":
+        high_level_reason = (
+            "experimental shared/unseen ATMS conditioning"
+            if not args.disable_high_level
+            else "disabled by default for an unseen participant"
+        )
+    expected_channels = 32 if args.mode == "lab-live" else (64 if args.mode == "live" else None)
+    monitor = RuntimeMonitorState(
+        mode=args.mode,
+        high_level_enabled=not args.disable_high_level,
+        session_id=args.session_id,
+        participant_code=args.participant_code,
+        participant_mode=args.participant_mode,
+        high_level_reason=high_level_reason,
+        marker_test_required=args.marker_test_required,
+        expected_eeg_channel_count=expected_channels,
+        expected_eeg_sampling_rate=args.eeg_sampling_rate if args.mode in {"live", "lab-live"} else None,
+        channel_order_confirmation_required=args.mode == "lab-live",
+        output_writable=output_writable,
+        output_root=output_root,
+    )
+    scaled_low_level_latents = args.low_level_latent_scaling == "sdxl" or (
+        args.low_level_latent_scaling == "auto"
+        and args.mode in {"lab-live", "lab-replay"}
+        and args.lab_adapter == "none"
+    )
+    decoder = LowLevelVAEDecoder(device=args.device, scaled_latents=scaled_low_level_latents)
 
     worker = None
     atms_embedder = None
@@ -232,11 +425,18 @@ def main() -> int:
             monitor.set_latest_high_level(path, {"path": str(path)})
 
         refiner = HighLevelRefiner(
-            atms_checkpoint=checkpoints_dir / "atms_sub01_40.pth",
-            prior_checkpoint=checkpoints_dir / "prior_sub01_fdn.pt",
-            subject_id=args.subject_id,
+            atms_checkpoint=args.lab_atms_checkpoint
+            if args.mode in {"lab-live", "lab-replay"} and args.lab_adapter == "none"
+            else checkpoints_dir / "atms_sub01_40.pth",
+            prior_checkpoint=args.lab_prior_checkpoint
+            if args.mode in {"lab-live", "lab-replay"} and args.lab_adapter == "none"
+            else checkpoints_dir / "prior_sub01_fdn.pt",
+            subject_id=None
+            if args.mode == "lab-live" and args.participant_mode == "unseen"
+            else args.subject_id,
             text_prompt=args.text_prompt,
             device=args.device,
+            atms_mode="starstim31" if args.mode in {"lab-live", "lab-replay"} and args.lab_adapter == "none" else "legacy",
         )
         worker = SemanticRefinementWorker(
             refiner=refiner,
@@ -249,6 +449,7 @@ def main() -> int:
     if args.mode in {"live", "lab-live"}:
         epoch_preprocessor = None
         expected_epoch_samples = 1000
+        expected_channel_labels = None
         if args.mode == "lab-live":
             if args.lab_adapter == "starstim31-to-things63":
                 encoder = LowLevelStarstimThingsAdapterRealtimeEncoder(
@@ -257,19 +458,31 @@ def main() -> int:
                 )
             else:
                 from maryam_rt.integration.starstim_preprocessing import StarstimLivePreprocessor
+                from maryam_rt.integration.montage import STARSTIM_32_CHANNELS
 
                 lab_model_channels = args.lab_model_channels or 31
-                encoder = LowLevelEpochEncoder(
-                    checkpoint_path=args.lab_low_level_checkpoint,
-                    device=args.device,
-                    model_num_channels=lab_model_channels,
-                )
+                if args.lab_low_level_arch == "transformed":
+                    encoder = LowLevelTransformedEpochEncoder(
+                        checkpoint_path=args.lab_low_level_checkpoint,
+                        device=args.device,
+                        model_num_channels=lab_model_channels,
+                        subject_id=args.lab_low_level_subject_id
+                        if args.lab_low_level_subject_id is not None
+                        else args.subject_id,
+                    )
+                else:
+                    encoder = LowLevelEpochEncoder(
+                        checkpoint_path=args.lab_low_level_checkpoint,
+                        device=args.device,
+                        model_num_channels=lab_model_channels,
+                    )
                 epoch_preprocessor = StarstimLivePreprocessor(
                     input_sfreq=args.eeg_sampling_rate,
                     tmin=-args.pre_event_ms / 1000.0,
                     tmax=args.post_event_ms / 1000.0,
                 )
                 expected_epoch_samples = None
+                expected_channel_labels = tuple(STARSTIM_32_CHANNELS)
             eeg_channels = 32
         else:
             encoder = LowLevelRealtimeEncoder(
@@ -277,32 +490,83 @@ def main() -> int:
                 device=args.device,
             )
             eeg_channels = 64
-        runner = TriggeredReconstructionRunner(
-            encoder=encoder,
-            decoder=decoder,
-            worker=worker,
-            output_low_dir=output_low,
-            output_meta_dir=output_meta,
-            output_target_dir=output_targets,
-            assessor_writer=assessor_writer,
+        numeric_trigger_map = None
+        if args.live_trigger_map is not None:
+            from maryam_rt.integration.live_markers import load_live_trigger_map
+
+            numeric_trigger_map = load_live_trigger_map(args.live_trigger_map)
+
+        def _values(raw: str) -> tuple[str, ...]:
+            return tuple(value.strip() for value in raw.split(",") if value.strip())
+
+        def _build_live_runner(
+            eeg_stream_name: str,
+            marker_stream_name: str,
+            eeg_source_id: str | None,
+            marker_source_id: str | None,
+        ) -> TriggeredReconstructionRunner:
+            return TriggeredReconstructionRunner(
+                encoder=encoder,
+                decoder=decoder,
+                worker=worker,
+                output_low_dir=output_low,
+                output_meta_dir=output_meta,
+                output_target_dir=output_targets,
+                assessor_writer=assessor_writer,
+                monitor=monitor,
+                config=TriggeredRunnerConfig(
+                    eeg_stream_name=eeg_stream_name,
+                    marker_stream_name=marker_stream_name,
+                    eeg_source_id=eeg_source_id,
+                    marker_source_id=marker_source_id,
+                    pre_event_ms=args.pre_event_ms,
+                    post_event_ms=args.post_event_ms,
+                    trigger_values=_values(args.trigger_values),
+                    experiment_start_values=_values(args.experiment_start_values),
+                    experiment_pause_values=_values(args.experiment_pause_values),
+                    experiment_resume_values=_values(args.experiment_resume_values),
+                    experiment_end_values=_values(args.experiment_end_values),
+                    marker_test_values=_values(args.marker_test_values),
+                    heartbeat_values=_values(args.heartbeat_values),
+                    marker_heartbeat_timeout_s=args.marker_heartbeat_timeout_seconds,
+                    trigger_cooldown_ms=args.trigger_cooldown_ms,
+                    eeg_sampling_rate=args.eeg_sampling_rate,
+                    eeg_channels=eeg_channels,
+                    poll_interval_ms=args.poll_interval_ms,
+                    ring_buffer_seconds=args.ring_buffer_seconds,
+                    image_root=args.image_root,
+                    expected_epoch_samples=expected_epoch_samples,
+                    expected_channel_labels=expected_channel_labels,
+                    min_buffer_seconds=args.min_buffer_seconds,
+                    post_event_timeout_s=args.post_event_timeout_seconds,
+                    require_arm=args.mode == "lab-live",
+                    start_on_first_trigger=args.legacy_start_on_first_trigger,
+                    numeric_trigger_map=numeric_trigger_map,
+                    session_id=args.session_id,
+                    participant_code=args.participant_code,
+                    model_metadata={
+                        "low_level_checkpoint": str(args.lab_low_level_checkpoint)
+                        if args.mode == "lab-live"
+                        else str(checkpoints_dir / "low_level_encoder_sub01_60.pth"),
+                        "low_level_arch": args.lab_low_level_arch if args.mode == "lab-live" else "legacy",
+                        "atms_checkpoint": str(args.lab_atms_checkpoint) if not args.disable_high_level else "disabled",
+                        "prior_checkpoint": str(args.lab_prior_checkpoint) if not args.disable_high_level else "disabled",
+                        "participant_conditioning": "shared_unseen"
+                        if args.participant_mode == "unseen"
+                        else f"known:{args.subject_id}",
+                    },
+                ),
+                epoch_preprocessor=epoch_preprocessor,
+            )
+
+        controller = LiveController(
+            runner=None,
             monitor=monitor,
-            config=TriggeredRunnerConfig(
-                eeg_stream_name=args.eeg_stream_name,
-                marker_stream_name=args.marker_stream_name,
-                pre_event_ms=args.pre_event_ms,
-                post_event_ms=args.post_event_ms,
-                trigger_values=tuple(v.strip() for v in args.trigger_values.split(",") if v.strip()),
-                trigger_cooldown_ms=args.trigger_cooldown_ms,
-                eeg_sampling_rate=args.eeg_sampling_rate,
-                eeg_channels=eeg_channels,
-                poll_interval_ms=args.poll_interval_ms,
-                ring_buffer_seconds=args.ring_buffer_seconds,
-                image_root=args.image_root,
-                expected_epoch_samples=expected_epoch_samples,
-            ),
-            epoch_preprocessor=epoch_preprocessor,
+            runner_factory=_build_live_runner,
+            auto_connect=args.auto_connect,
+            default_eeg_stream_name=args.eeg_stream_name,
+            default_marker_stream_name=args.marker_stream_name,
         )
-        controller = LiveController(runner=runner, monitor=monitor)
     elif args.mode == "things-replay":
         encoder = LowLevelEpochEncoder(
             checkpoint_path=checkpoints_dir / "low_level_encoder_sub01_60.pth",
@@ -344,14 +608,23 @@ def main() -> int:
             )
         else:
             lab_model_channels = args.lab_model_channels or 31
-            encoder = LowLevelEpochEncoder(
-                checkpoint_path=args.lab_low_level_checkpoint,
-                device=args.device,
-                model_num_channels=lab_model_channels,
-            )
+            if args.lab_low_level_arch == "transformed":
+                encoder = LowLevelTransformedEpochEncoder(
+                    checkpoint_path=args.lab_low_level_checkpoint,
+                    device=args.device,
+                    model_num_channels=lab_model_channels,
+                    subject_id=args.lab_low_level_subject_id,
+                )
+            else:
+                encoder = LowLevelEpochEncoder(
+                    checkpoint_path=args.lab_low_level_checkpoint,
+                    device=args.device,
+                    model_num_channels=lab_model_channels,
+                )
         runner = LabReplayRunner(
             config=LabReplayConfig(
                 data_root=args.lab_data_root,
+                replay_source=args.lab_replay_source,
                 epoch_npz=args.lab_epoch_npz,
                 target_manifest=args.lab_target_manifest,
                 split_manifest=args.lab_split_manifest,
@@ -363,6 +636,13 @@ def main() -> int:
                 sleep_seconds=args.sleep_seconds,
                 adapter=args.lab_adapter,
                 atms_subject_id=args.lab_atms_subject_id,
+                raw_tmin=-args.pre_event_ms / 1000.0,
+                raw_tmax=args.post_event_ms / 1000.0,
+                raw_input_sfreq=args.eeg_sampling_rate,
+                lab_whitening=args.lab_whitening,
+                lab_whitening_split=args.lab_whitening_split,
+                lab_whitening_cache=args.lab_whitening_cache,
+                lab_whitening_subject=args.lab_whitening_subject,
             ),
             encoder=encoder,
             decoder=decoder,
@@ -373,13 +653,58 @@ def main() -> int:
         )
         controller = ReplayController(runner=runner, monitor=monitor)
 
+    if args.mode in {"live", "lab-live"}:
+        session_path = output_root / "session.json"
+        session_payload = json.loads(session_path.read_text())
+        session_payload.update(
+            {
+                "lifecycle_status": "waiting_for_equipment",
+                "models_loaded": True,
+                "low_level_checkpoint": str(args.lab_low_level_checkpoint)
+                if args.mode == "lab-live"
+                else str(checkpoints_dir / "low_level_encoder_sub01_60.pth"),
+                "high_level_enabled": not args.disable_high_level,
+                "high_level_reason": high_level_reason,
+            }
+        )
+        session_path.write_text(json.dumps(session_payload, indent=2))
+
     app = create_app(controller)
+    if args.open_browser:
+        browser_host = "127.0.0.1" if args.host in {"0.0.0.0", "::"} else args.host
+        threading.Timer(1.5, lambda: webbrowser.open(f"http://{browser_host}:{args.port}")).start()
     try:
         uvicorn.run(app, host=args.host, port=args.port, log_level="info")
     finally:
         if worker is not None:
             worker.stop()
     return 0
+
+
+def main() -> int:
+    try:
+        return _run_main()
+    except Exception as exc:
+        args = parse_args()
+        apply_mode_defaults(args)
+        import uvicorn
+
+        from maryam_rt.gui.monitor import RuntimeMonitorState
+        from maryam_rt.gui.server import ErrorController, create_app
+
+        monitor = RuntimeMonitorState(
+            mode=args.mode,
+            high_level_enabled=False,
+            session_id=args.session_id,
+            participant_code=args.participant_code,
+            participant_mode=args.participant_mode,
+            high_level_reason="unavailable because startup failed",
+        )
+        monitor.fail(f"Startup failed: {exc}")
+        controller = ErrorController(monitor)
+        app = create_app(controller)
+        uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+        return 1
 
 
 if __name__ == "__main__":

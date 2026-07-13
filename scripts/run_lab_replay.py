@@ -17,7 +17,13 @@ def parse_args() -> argparse.Namespace:
         "--data-root",
         type=Path,
         default=PROJECT_ROOT / "data",
-        help="Root containing derived/lab_starstim31_epochs_250hz.npz and derived/finetune manifests.",
+        help="Root containing raw subject folders and derived/finetune manifests.",
+    )
+    parser.add_argument(
+        "--replay-source",
+        choices=["raw", "derived"],
+        default="raw",
+        help="raw re-extracts .easy epochs with the lab-live preprocessor; derived uses cached 31x250 epochs.",
     )
     parser.add_argument("--epoch-npz", type=Path, default=None, help="Optional lab epoch npz override.")
     parser.add_argument("--target-manifest", type=Path, default=None, help="Optional lab target manifest override.")
@@ -31,6 +37,37 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-trials", type=int, default=10, help="Maximum number of lab trials to replay.")
     parser.add_argument("--start-trial", type=int, default=0, help="Start from this filtered lab trial index.")
     parser.add_argument("--sleep-seconds", type=float, default=0.0, help="Optional delay between trials.")
+    parser.add_argument("--raw-pre-event-ms", type=float, default=200.0, help="Raw replay milliseconds before trigger.")
+    parser.add_argument("--raw-post-event-ms", type=float, default=1000.0, help="Raw replay milliseconds after trigger.")
+    parser.add_argument(
+        "--raw-input-sfreq",
+        type=float,
+        default=None,
+        help="Override raw .easy sampling rate. Defaults to .info, then 500 Hz.",
+    )
+    parser.add_argument(
+        "--lab-whitening",
+        choices=["none", "mvnn"],
+        default="none",
+        help="Optional lab replay whitening applied to the model input. Use mvnn for train-split MVNN.",
+    )
+    parser.add_argument(
+        "--lab-whitening-split",
+        choices=["all", "train", "val"],
+        default="train",
+        help="Lab split used to compute the MVNN whitener.",
+    )
+    parser.add_argument(
+        "--lab-whitening-cache",
+        type=Path,
+        default=None,
+        help="Optional .npy path for loading/saving the lab MVNN whitening matrix.",
+    )
+    parser.add_argument(
+        "--lab-whitening-subject",
+        default=None,
+        help="Optional subject folder used to compute the whitener. Defaults to --subject.",
+    )
     parser.add_argument(
         "--adapter",
         choices=["starstim31-to-things63", "none"],
@@ -51,6 +88,24 @@ def parse_args() -> argparse.Namespace:
         help="Native lab checkpoint channel count. Defaults to 31 for current lab replay epochs.",
     )
     parser.add_argument(
+        "--lab-low-level-arch",
+        choices=["plain", "transformed"],
+        default="plain",
+        help="Low-level checkpoint architecture. Use transformed for custom encoder_low_level_transformed checkpoints.",
+    )
+    parser.add_argument(
+        "--lab-low-level-subject-id",
+        type=int,
+        default=None,
+        help="Subject id for transformed low-level checkpoints. Defaults to each trial's manifest lab_subject_id.",
+    )
+    parser.add_argument(
+        "--low-level-latent-scaling",
+        choices=["auto", "direct", "sdxl"],
+        default="auto",
+        help="How to decode low-level latents. auto uses SDXL scaling for transformed lab checkpoints.",
+    )
+    parser.add_argument(
         "--output-root",
         type=Path,
         default=PROJECT_ROOT / "outputs" / "lab_replay",
@@ -66,6 +121,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=PROJECT_ROOT / "checkpoints" / "hierarchical" / "atms_starstim31_10sub_best.pth",
         help="Starstim31 ATMS checkpoint used when --enable-lab-atms-embedding is set.",
+    )
+    parser.add_argument(
+        "--lab-prior-checkpoint",
+        type=Path,
+        default=None,
+        help="Native lab diffusion prior checkpoint for high-level refinement.",
     )
     parser.add_argument(
         "--lab-atms-subject-id",
@@ -102,19 +163,27 @@ def main() -> int:
         if args.lab_low_level_checkpoint is None:
             raise SystemExit(
                 "Lab replay is native Starstim by default, but no native lab low-level checkpoint was given. "
-                "The current derived lab epoch file is 31-channel because preprocessing drops Fz. "
+                "Raw and derived lab replay both produce 31-channel model epochs because preprocessing drops Fz. "
                 "Pass --lab-low-level-checkpoint /path/to/checkpoint.pth, or explicitly pass "
                 "--adapter starstim31-to-things63 to run the old THINGS63 compatibility path."
             )
         if not args.disable_high_level:
-            raise SystemExit(
-                "Native lab low-level replay is configured, but the high-level ATMS wrapper still defaults to "
-                "the THINGS63 checkpoint. Pass --disable-high-level for native lab replay, or use "
-                "--adapter starstim31-to-things63 for the existing compatibility stack."
-            )
+            if args.lab_prior_checkpoint is None:
+                raise SystemExit(
+                    "Native lab high-level replay needs a lab diffusion prior. Pass "
+                    "--lab-prior-checkpoint /path/to/lab_prior_best_fdn.pt, or pass --disable-high-level."
+                )
+        if args.lab_low_level_arch == "transformed" and args.lab_model_channels == 32:
+            raise SystemExit("Transformed lab low-level checkpoints are currently supported only for 31-channel epochs.")
+    if args.lab_whitening != "none" and args.adapter != "none":
+        raise SystemExit("--lab-whitening mvnn is only supported with --adapter none.")
 
     from maryam_rt.integration.lab_replay import LabReplayConfig, LabReplayRunner
-    from maryam_rt.integration.low_level import LowLevelEpochEncoder, LowLevelVAEDecoder
+    from maryam_rt.integration.low_level import (
+        LowLevelEpochEncoder,
+        LowLevelTransformedEpochEncoder,
+        LowLevelVAEDecoder,
+    )
 
     checkpoints_dir = PROJECT_ROOT / "checkpoints" / "hierarchical"
     low_level_checkpoint = args.lab_low_level_checkpoint
@@ -122,12 +191,24 @@ def main() -> int:
     if args.adapter == "starstim31-to-things63":
         low_level_checkpoint = checkpoints_dir / "low_level_encoder_sub01_60.pth"
         model_num_channels = 63
-    encoder = LowLevelEpochEncoder(
-        checkpoint_path=low_level_checkpoint,
-        device=args.device,
-        model_num_channels=model_num_channels,
+    if args.lab_low_level_arch == "transformed":
+        encoder = LowLevelTransformedEpochEncoder(
+            checkpoint_path=low_level_checkpoint,
+            device=args.device,
+            model_num_channels=model_num_channels,
+            subject_id=args.lab_low_level_subject_id,
+        )
+    else:
+        encoder = LowLevelEpochEncoder(
+            checkpoint_path=low_level_checkpoint,
+            device=args.device,
+            model_num_channels=model_num_channels,
+        )
+    scaled_low_level_latents = args.low_level_latent_scaling == "sdxl" or (
+        args.low_level_latent_scaling == "auto"
+        and args.adapter == "none"
     )
-    decoder = LowLevelVAEDecoder(device=args.device)
+    decoder = LowLevelVAEDecoder(device=args.device, scaled_latents=scaled_low_level_latents)
 
     worker = None
     atms_embedder = None
@@ -155,11 +236,12 @@ def main() -> int:
         from maryam_rt.integration.worker import SemanticRefinementWorker
 
         refiner = HighLevelRefiner(
-            atms_checkpoint=checkpoints_dir / "atms_sub01_40.pth",
-            prior_checkpoint=checkpoints_dir / "prior_sub01_fdn.pt",
+            atms_checkpoint=args.lab_atms_checkpoint if args.adapter == "none" else checkpoints_dir / "atms_sub01_40.pth",
+            prior_checkpoint=args.lab_prior_checkpoint if args.adapter == "none" else checkpoints_dir / "prior_sub01_fdn.pt",
             subject_id=args.subject_id,
             text_prompt=args.text_prompt,
             device=args.device,
+            atms_mode="starstim31" if args.adapter == "none" else "legacy",
         )
         worker = SemanticRefinementWorker(
             refiner=refiner,
@@ -172,6 +254,7 @@ def main() -> int:
         runner = LabReplayRunner(
             config=LabReplayConfig(
                 data_root=args.data_root,
+                replay_source=args.replay_source,
                 epoch_npz=args.epoch_npz,
                 target_manifest=args.target_manifest,
                 split_manifest=args.split_manifest,
@@ -183,6 +266,13 @@ def main() -> int:
                 sleep_seconds=args.sleep_seconds,
                 adapter=args.adapter,
                 atms_subject_id=args.lab_atms_subject_id,
+                raw_tmin=-args.raw_pre_event_ms / 1000.0,
+                raw_tmax=args.raw_post_event_ms / 1000.0,
+                raw_input_sfreq=args.raw_input_sfreq,
+                lab_whitening=args.lab_whitening,
+                lab_whitening_split=args.lab_whitening_split,
+                lab_whitening_cache=args.lab_whitening_cache,
+                lab_whitening_subject=args.lab_whitening_subject,
             ),
             encoder=encoder,
             decoder=decoder,

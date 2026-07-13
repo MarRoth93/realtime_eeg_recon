@@ -108,6 +108,12 @@ raw Starstim32 epoch
 
 ### Variant B: MVNN Whitened
 
+Status: keep this as a future experiment for now. The current lab replay
+checkpoints were not trained with MVNN-whitened EEG as their input contract, so
+enabling replay-time MVNN whitening can create a train/inference mismatch even
+if the whitening matrix is numerically valid. For the current GUI runs, prefer
+the baseline-only path and omit `--lab-whitening mvnn`.
+
 Compute MVNN from train rows only, then apply the same whitening matrix to
 train and val rows.
 

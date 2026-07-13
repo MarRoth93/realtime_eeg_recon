@@ -14,6 +14,7 @@ from maryam_rt.hierarchical.atms_pipeline.diffusion_prior import (
     DiffusionPriorUNet_FDN,
     Pipe,
 )
+from maryam_rt.integration.starstim31_atms import Starstim31ATMSEmbedder
 
 
 class HighLevelRefiner:
@@ -23,7 +24,7 @@ class HighLevelRefiner:
         self,
         atms_checkpoint: str | Path,
         prior_checkpoint: str | Path,
-        subject_id: int = 0,
+        subject_id: int | None = 0,
         use_fdn: bool = True,
         num_prior_steps: int = 50,
         num_sdxl_steps: int = 10,
@@ -31,19 +32,28 @@ class HighLevelRefiner:
         img2img_strength: float = 0.8,
         text_prompt: str = "a photo of an object",
         device: str = "cuda",
+        atms_mode: str = "legacy",
     ) -> None:
         self.device = device
         self.subject_id = subject_id
         self.num_prior_steps = num_prior_steps
         self.guidance_scale = guidance_scale
         self.text_prompt = text_prompt
+        self.atms_mode = atms_mode
 
-        self.atms = ATMS(num_subjects=1).to(device)
-        atms_state = torch.load(atms_checkpoint, map_location=device, weights_only=True)
-        exclude = {"subject_wise_linear.1.weight", "subject_wise_linear.1.bias"}
-        atms_state = {key: value for key, value in atms_state.items() if key not in exclude}
-        self.atms.load_state_dict(atms_state, strict=False)
-        self.atms.eval()
+        self.atms_embedder: Starstim31ATMSEmbedder | None = None
+        self.atms: ATMS | None = None
+        if atms_mode == "starstim31":
+            self.atms_embedder = Starstim31ATMSEmbedder(Path(atms_checkpoint), device=device)
+        elif atms_mode == "legacy":
+            self.atms = ATMS(num_subjects=1).to(device)
+            atms_state = torch.load(atms_checkpoint, map_location=device, weights_only=True)
+            exclude = {"subject_wise_linear.1.weight", "subject_wise_linear.1.bias"}
+            atms_state = {key: value for key, value in atms_state.items() if key not in exclude}
+            self.atms.load_state_dict(atms_state, strict=False)
+            self.atms.eval()
+        else:
+            raise ValueError(f"Unsupported atms_mode: {atms_mode}")
 
         if use_fdn:
             self.prior = DiffusionPriorUNet_FDN(cond_dim=1024, dropout=0.1).to(device)
@@ -72,13 +82,21 @@ class HighLevelRefiner:
             x250 = x250.unsqueeze(0)
         x250 = x250.to(self.device, dtype=torch.float32)
 
-        subject_ids = torch.full(
-            (x250.shape[0],),
-            self.subject_id,
-            dtype=torch.long,
-            device=self.device,
-        )
-        eeg_emb = self.atms(x250, subject_ids)
+        if self.atms_mode == "starstim31":
+            if self.atms_embedder is None:
+                raise RuntimeError("Starstim31 ATMS embedder was not initialized.")
+            eeg_emb = self.atms_embedder.embed(x250, subject_id=self.subject_id).to(self.device)
+        else:
+            if self.atms is None:
+                raise RuntimeError("Legacy ATMS model was not initialized.")
+            legacy_subject_id = 0 if self.subject_id is None else self.subject_id
+            subject_ids = torch.full(
+                (x250.shape[0],),
+                legacy_subject_id,
+                dtype=torch.long,
+                device=self.device,
+            )
+            eeg_emb = self.atms(x250, subject_ids)
         if eeg_emb.ndim == 3 and eeg_emb.shape[1] == 1:
             eeg_emb = eeg_emb[:, 0, :]
 

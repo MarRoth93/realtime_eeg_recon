@@ -1,10 +1,9 @@
 # Project Improvements
 
-Prioritized list of engineering and correctness issues to address in the
-realtime EEG reconstruction project. The two missing Starstim31 checkpoints
-(native low-level EEG→VAE latent, and diffusion prior / reconstruction) are
-tracked separately in `docs/lab_realtime_pipeline_status.md` and are
-intentionally excluded here.
+Prioritized list of engineering and correctness issues for the realtime EEG
+reconstruction project. Native Starstim31 low-level and diffusion-prior
+checkpoints are now present; their status is tracked in
+`docs/lab_realtime_pipeline_status.md`.
 
 ## Current status
 
@@ -22,8 +21,11 @@ intentionally excluded here.
 - Done: native `lab-live` now uses the offline-style Starstim epoch path:
   32-channel raw epoch, drop `Fz`, average reference, resample to 250 Hz,
   baseline-correct on `-200..0 ms`, and crop `0..1 s` to `31 x 250`.
-- Remaining: training-time whitening parity still needs a final decision once
-  the native checkpoints are available; the assessor pipeline still depends on
+- Done: live mode has explicit readiness, Arm/Run/Finish phases, recoverable
+  stream waiting, post-event timeouts, numerical trigger mapping, unseen/shared
+  participant conditioning, and isolated session outputs.
+- Remaining: training-time whitening parity remains a separate experiment;
+  the assessor pipeline still depends on
   the timm CLIP ViT-L/14 backbone cache for fully offline inference; vendoring
   Plotly remains low priority if the rig must run fully air-gapped.
 
@@ -42,10 +44,11 @@ Covered now:
 - `parse_marker_payload`
 - `Starstim31ATMSEmbedder` shape contract (`(B,31,250)` → `(1,1024)`)
 - assessor JSON sidecars and the triplet summary figure/JSON contract
+- live never-started, partial-connect, invalid-rate, buffer-warmup, Arm/start/end,
+  post-event timeout, marker-test reset, and numerical trigger-map behavior
 
 Still worth adding:
 
-- epoch-sample math in `triggered_runner` (`epoch_samples == 1000` guard)
 - a smoke test for low-level metadata linking assessor JSON sidecars
 - a high-level worker test that confirms assessor sidecars are written after
   refined-image save

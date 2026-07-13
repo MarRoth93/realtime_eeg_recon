@@ -166,6 +166,57 @@ class iTransformer(nn.Module):
         # print("enc_out", enc_out.shape)
         return enc_out
 
+
+class iTransformerConfigured(nn.Module):
+    """iTransformer variant that returns the configured EEG channel count."""
+
+    def __init__(self, configs, joint_train=False, num_subjects=10):
+        super(iTransformerConfigured, self).__init__()
+        self.task_name = configs.task_name
+        self.seq_len = configs.seq_len
+        self.pred_len = configs.pred_len
+        self.output_attention = configs.output_attention
+        self.enc_in = configs.enc_in
+        self.enc_embedding = DataEmbedding(
+            configs.seq_len,
+            configs.d_model,
+            configs.embed,
+            configs.freq,
+            configs.dropout,
+            joint_train=joint_train,
+            num_subjects=num_subjects,
+        )
+        self.encoder = Encoder(
+            [
+                EncoderLayer(
+                    AttentionLayer(
+                        FullAttention(
+                            False,
+                            configs.factor,
+                            attention_dropout=configs.dropout,
+                            output_attention=configs.output_attention,
+                        ),
+                        configs.d_model,
+                        configs.n_heads,
+                    ),
+                    configs.d_model,
+                    configs.d_ff,
+                    dropout=configs.dropout,
+                    activation=configs.activation,
+                )
+                for _ in range(configs.e_layers)
+            ],
+            norm_layer=torch.nn.LayerNorm(configs.d_model),
+        )
+
+    def forward(self, x_enc, x_mark_enc, subject_ids=None):
+        enc_out = self.enc_embedding(x_enc, x_mark_enc, subject_ids)
+        enc_out, _ = self.encoder(enc_out, attn_mask=None)
+        if subject_ids is not None and enc_out.shape[1] > self.enc_in:
+            return enc_out[:, 1 : self.enc_in + 1, :]
+        return enc_out[:, : self.enc_in, :]
+
+
 class PatchEmbedding(nn.Module):
     def __init__(self, emb_size=40):
         super().__init__()
@@ -301,19 +352,19 @@ class encoder_low_level(nn.Module):
         self.subject_wise_linear = nn.ModuleList([nn.Linear(sequence_length, 128) for _ in range(num_subjects)])
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
         self.loss_func = ClipLoss()
-        self.dropout = nn.Dropout(0.5)
+        self.dim = num_channels * 128
 
         # CNN upsampler
         self.upsampler = nn.Sequential(
-            nn.ConvTranspose2d(8064, 1024, 4, 2, 1),
+            nn.ConvTranspose2d(self.dim, 1024, 4, 2, 1),
             nn.BatchNorm2d(1024),
             nn.ReLU(inplace=True),
-            nn.Dropout2d(0.3),
+            nn.Dropout2d(0.1),
 
             nn.ConvTranspose2d(1024, 512, 4, 2, 1),
             nn.BatchNorm2d(512),
             nn.ReLU(inplace=True),
-            nn.Dropout2d(0.3),
+            nn.Dropout2d(0.1),
 
             nn.ConvTranspose2d(512, 256, 4, 2, 1),
             nn.BatchNorm2d(256),
@@ -337,13 +388,106 @@ class encoder_low_level(nn.Module):
             nn.ReLU(inplace=True),
 
             nn.ConvTranspose2d(16, 4, 1, 1, 0),
+            nn.BatchNorm2d(4)
         )
 
 
     def forward(self, x):
         # Apply subject-wise linear layer
-        x = self.subject_wise_linear[0](x)  # Output shape: (batchsize, 63, 128)
+        x = self.subject_wise_linear[0](x)
         # Reshape to match the input size for the upsampler
-        x = x.view(x.size(0), 8064, 1, 1)  # Reshape to (batch_size, 8064, 1, 1)
+        x = x.view(x.size(0), self.dim, 1, 1)
         out = self.upsampler(x)  # Pass through the upsampler
         return out
+
+
+class encoder_low_level_transformed(nn.Module):
+    """Low-level VAE-latent encoder with an iTransformer EEG backbone."""
+
+    def __init__(
+        self,
+        num_channels=63,
+        sequence_length=250,
+        num_subjects=1,
+        num_features=64,
+        num_latents=1024,
+        num_blocks=1,
+        freeze_backbone=True,
+        pretrained_path=None,
+    ):
+        super(encoder_low_level_transformed, self).__init__()
+        config = Config()
+        config.seq_len = sequence_length
+        config.pred_len = sequence_length
+        config.d_model = sequence_length
+        config.enc_in = num_channels
+        config.task_name = "classification"
+        config.output_attention = False
+        config.embed = "timeF"
+        config.freq = "h"
+        config.dropout = 0.25
+        config.factor = 1
+        config.n_heads = 4
+        config.e_layers = 8
+        config.d_ff = 256
+        config.activation = "gelu"
+
+        self.encoder = iTransformerConfigured(config, num_subjects=10)
+        if pretrained_path:
+            self._load_pretrained(pretrained_path)
+
+        if freeze_backbone:
+            for param in self.encoder.parameters():
+                param.requires_grad = False
+
+        self.subject_wise_linear = nn.ModuleList([nn.Linear(sequence_length, 128) for _ in range(num_subjects)])
+        self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
+        self.loss_func = ClipLoss()
+        self.dim = num_channels * 128
+
+        self.upsampler = nn.Sequential(
+            nn.ConvTranspose2d(self.dim, 1024, 4, 2, 1),
+            nn.BatchNorm2d(1024),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(0.1),
+            nn.ConvTranspose2d(1024, 512, 4, 2, 1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(0.1),
+            nn.ConvTranspose2d(512, 256, 4, 2, 1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(0.2),
+            nn.ConvTranspose2d(256, 128, 4, 2, 1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(128, 64, 4, 2, 1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(64, 32, 4, 2, 1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(32, 16, 1, 1, 0),
+            nn.BatchNorm2d(16),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(16, 4, 1, 1, 0),
+            nn.BatchNorm2d(4),
+        )
+
+    def _load_pretrained(self, path):
+        ckpt = torch.load(path, map_location="cpu", weights_only=False)
+        state_dict = ckpt["model"] if "model" in ckpt else ckpt
+        backbone_dict = {
+            key.replace("backbone.", ""): value
+            for key, value in state_dict.items()
+            if key.startswith("backbone.")
+        }
+        self.encoder.load_state_dict(backbone_dict, strict=False)
+
+    def forward(self, x, subject_ids=None):
+        if subject_ids is None:
+            subject_ids = torch.zeros(x.shape[0], dtype=torch.long, device=x.device)
+        x = self.encoder(x, None, subject_ids=subject_ids)
+        x = self.subject_wise_linear[0](x)
+        x = x.view(x.size(0), self.dim, 1, 1)
+        return self.upsampler(x)

@@ -18,10 +18,9 @@ visual stimulus -> live Starstim EEG -> trigger-aligned EEG epoch
 -> assessor ratings -> GUI / saved result artifacts
 ```
 
-The live reconstruction path is architecturally in place. The remaining practical
-requirements are the correct native Starstim31 low-level reconstruction checkpoint,
-a Starstim-compatible high-level reconstruction prior, and a verified local
-runtime environment with the required model caches.
+The live reconstruction path and native checkpoints are in place. The remaining
+practical requirement is an in-room validation of NIC2 discovery, channel order,
+marker timing, reconnect behavior, and optional offline model caches.
 
 ## Experimental Input
 
@@ -121,30 +120,31 @@ preprocessed EEG epoch, 31 x 250
 ```
 
 The project already contains the Starstim31 ATMS embedding checkpoint and code
-path. The missing part is the correct Starstim-compatible high-level diffusion
-prior / reconstruction checkpoint. Until that exists, the EEG embedding can be
-computed, but the final high-level reconstruction should not be treated as
-complete.
+path. The runtime can now use a Starstim31-compatible high-level diffusion prior
+when passed with `--lab-prior-checkpoint`. Until that lab prior is trained and
+provided, the EEG embedding can be computed, but the final high-level
+reconstruction should not be treated as complete.
 
 ## Offline Replay Capability
 
-The offline replay mode uses pre-extracted lab epochs rather than live LSL
-streams. This is useful for debugging, demonstrations, and reproducible testing
-without the Starstim device connected.
+The lab replay mode can run from raw recorded Starstim `.easy` files rather
+than live LSL streams. This is useful for debugging, demonstrations, and
+reproducible testing without the Starstim device connected while still using
+the same model-facing preprocessing as `lab-live`.
 
-The offline lab replay file contains model-ready epochs:
+The default raw replay path extracts the recorded `-0.2..1.0 s` Starstim32
+epoch around each manifest-aligned marker, then applies the shared live
+preprocessor. The resulting model-ready epoch is:
 
 ```text
 N trials x 31 channels x 250 samples
 ```
 
-For subject `P07`, the replay mode can iterate through these epochs, resolve
+For subject `P07`, replay can iterate through these raw-derived epochs, resolve
 the target image from the manifest, run the reconstruction stack, and update the
-same browser GUI used for live mode.
-
-Offline replay and live mode are intended to converge on the same model-facing
-input representation. This makes offline replay a useful approximation of the
-live experiment pipeline.
+same browser GUI used for live mode. The older cached derived epoch source is
+still available for debugging, but raw replay is the closer approximation of
+the live experiment pipeline.
 
 ## GUI Behavior
 
@@ -227,20 +227,24 @@ Already implemented:
 - offline lab replay using derived Starstim31 `31 x 250` epochs,
 - live LSL EEG and marker ingestion,
 - native Starstim live preprocessing to `31 x 250`,
-- browser GUI for live/replay monitoring,
+- browser GUI with live setup, readiness, Arm, recovery, and replay monitoring,
 - Starstim31 ATMS embedding path,
+- trained shared/unseen ATMS conditioning exposed explicitly at runtime,
+- whitelisted numerical marker compatibility and a structured JSON marker contract,
+- per-session live output directories and lifecycle metadata,
 - assessor sidecar output for reconstructed and target images,
 - tests for channel mapping, resampling, marker parsing, ATMS shape contract,
   and assessor output format.
 
-Still required for full end-to-end capability:
+Still required before participant-facing operation:
 
-- native Starstim31 low-level EEG-to-image checkpoint,
-- Starstim-compatible high-level reconstruction prior,
-- verified full SDXL/high-level model cache,
+- an in-room hardware rehearsal with NIC2 and the actual PsychoPy task,
+- end-to-end evaluation before calling shared/unseen high-level output validated
+  rather than experimental,
+- verified full SDXL/high-level model cache when experimental high-level is used,
 - cached or locally available assessor CLIP backbone weights,
-- hardware validation with the actual NIC2 LSL stream names, sampling rate, and
-  channel metadata.
+- explicit operator confirmation of channel order when NIC2 exposes only generic
+  `Ch1..Ch32` labels.
 
 ## Practical Capability Statement
 
@@ -252,6 +256,6 @@ produce low-level and high-level image reconstructions, display the current
 trial in a browser GUI, and automatically rate the target and reconstructed
 images along multiple affective dimensions.
 
-In its current state, the architecture and data flow are in place. The most
-important remaining dependency is not the live-streaming design, but the
-availability of the correct Starstim-trained reconstruction checkpoints.
+In its current state, the software and model artifacts are in place. The most
+important remaining gate is a human/device validation in the lab; software-only
+checks cannot verify electrode impedance or the physical display-marker timing.

@@ -6,9 +6,14 @@ import threading
 import time
 from collections import deque
 from dataclasses import dataclass
-from typing import Deque, Optional
+from typing import Any, Deque, Optional
 
-from pylsl import StreamInfo, StreamInlet, resolve_streams
+try:
+    from pylsl import StreamInfo, StreamInlet, resolve_streams
+except ModuleNotFoundError:  # Allows marker/lifecycle tests in a minimal environment.
+    StreamInfo = Any  # type: ignore[misc,assignment]
+    StreamInlet = None  # type: ignore[assignment]
+    resolve_streams = None  # type: ignore[assignment]
 
 
 @dataclass(frozen=True)
@@ -55,6 +60,12 @@ class MarkerInletWrapper:
         self._inlet: Optional[StreamInlet] = None
         self._info: Optional[StreamInfo] = None
         self._last_error: Optional[Exception] = None
+        self._stream_name: Optional[str] = None
+        self._stream_type: Optional[str] = None
+        self._source_id: Optional[str] = None
+        self._last_event_monotonic: Optional[float] = None
+        self._connection_generation = 0
+        self._dropped_event_count = 0
         self._events: Deque[MarkerEvent] = deque(maxlen=config.max_queue_size)
 
     @property
@@ -64,6 +75,32 @@ class MarkerInletWrapper:
     @property
     def last_error(self) -> Optional[Exception]:
         return self._last_error
+
+    @property
+    def stream_name(self) -> Optional[str]:
+        return self._stream_name
+
+    @property
+    def stream_type(self) -> Optional[str]:
+        return self._stream_type
+
+    @property
+    def source_id(self) -> Optional[str]:
+        return self._source_id
+
+    @property
+    def last_event_age_seconds(self) -> Optional[float]:
+        if self._last_event_monotonic is None:
+            return None
+        return max(time.monotonic() - self._last_event_monotonic, 0.0)
+
+    @property
+    def connection_generation(self) -> int:
+        return self._connection_generation
+
+    @property
+    def dropped_event_count(self) -> int:
+        return self._dropped_event_count
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -97,7 +134,11 @@ class MarkerInletWrapper:
                 try:
                     self._inlet = self._create_inlet(info)
                     self._info = info
+                    self._stream_name = str(info.name())
+                    self._stream_type = str(info.type())
+                    self._source_id = str(info.source_id())
                     self._last_error = None
+                    self._connection_generation += 1
                     self._connected_event.set()
                 except Exception as exc:
                     self._last_error = exc
@@ -113,6 +154,8 @@ class MarkerInletWrapper:
                 time.sleep(self._config.reconnect_interval)
 
     def _resolve_stream_info(self) -> Optional[StreamInfo]:
+        if resolve_streams is None:
+            raise RuntimeError("pylsl is required for live marker streaming.")
         infos = resolve_streams(wait_time=self._config.resolve_timeout)
         if self._config.stream_name is not None:
             infos = [info for info in infos if info.name() == self._config.stream_name]
@@ -123,6 +166,8 @@ class MarkerInletWrapper:
         return infos[0] if infos else None
 
     def _create_inlet(self, info: StreamInfo) -> StreamInlet:
+        if StreamInlet is None:
+            raise RuntimeError("pylsl is required for live marker streaming.")
         inlet = StreamInlet(info, max_buflen=int(self._config.max_buflen_seconds))
         try:
             inlet.open_stream(timeout=self._config.resolve_timeout)
@@ -151,13 +196,22 @@ class MarkerInletWrapper:
                 value = sample
             events.append(MarkerEvent(value=str(value), timestamp=float(timestamp)))
         with self._lock:
+            overflow = max(len(self._events) + len(events) - self._config.max_queue_size, 0)
+            self._dropped_event_count += overflow
             self._events.extend(events)
+            self._last_event_monotonic = time.monotonic()
 
     def _disconnect(self) -> None:
         inlet = self._inlet
         self._inlet = None
         self._info = None
+        self._stream_name = None
+        self._stream_type = None
+        self._source_id = None
         self._connected_event.clear()
+        with self._lock:
+            self._events.clear()
+            self._last_event_monotonic = None
         if inlet is not None:
             try:
                 inlet.close_stream()

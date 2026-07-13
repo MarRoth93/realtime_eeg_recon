@@ -3,7 +3,7 @@
 ## Current Branch
 
 - Branch: `lab_data_setup`
-- Project root: `/home/marco/Marco/realtime_eeg_recon`
+- Project root: `/home/psycontrol/Marco/Maryam/01_maryam_realtime`
 - Lab data copied into the project under `data/derived`
 - Current working subject: `P07`
 
@@ -59,6 +59,23 @@ outputs/<run_name>/embeddings/*_starstim31_atms.pt
 
 Each metadata JSON also gets a `starstim31_atms_embedding` entry.
 
+Lab replay now defaults to raw recorded Starstim replay:
+
+```bash
+--replay-source raw
+```
+
+or, in GUI mode:
+
+```bash
+--lab-replay-source raw
+```
+
+This path reads each subject's `.easy` recording, extracts the raw Starstim32
+epoch around the recorded marker timing, and applies the same live preprocessing
+used by `lab-live`. The old cached `data/derived/lab_starstim31_epochs_250hz.npz`
+path remains available with `derived` for debugging.
+
 ## New Assessor Hook
 
 Direct replay and GUI modes can rate reconstructed images with:
@@ -100,31 +117,96 @@ ViT-L/14 timm backbone weights (`vit_large_patch14_clip_224.openai`) to be cache
 or downloadable at runtime; those weights were not present inside the source
 assessor project.
 
-## Still Missing
+## Remaining External Validation
 
-- Native Starstim31 low-level EEG-to-VAE-latent checkpoint.
-  - Needed for: P07/Starstim31 EEG epoch -> low-level image.
-  - The existing `checkpoints/hierarchical/low_level_encoder_sub01_60.pth` is THINGS63, not native Starstim31.
-- Starstim31-compatible diffusion prior / reconstruction checkpoint.
-  - Needed for: ATMS EEG embedding -> high-level semantic image reconstruction.
-  - The existing `checkpoints/hierarchical/prior_sub01_fdn.pt` is from the old THINGS path and should not be treated as the correct Starstim31 prior.
-- Full SDXL high-level cache may still need verification if the full-model download was not completed.
-  - VAE-only cache is verified.
-  - Full high-level generation also needs SDXL UNet, text encoders, tokenizers, scheduler, and config.
-- Full offline self-containment for the assessor still needs the CLIP ViT-L/14
-  backbone weights copied or cached locally.
+- Native checkpoints are now present at:
+  - `checkpoints/hierarchical/lab_low_level_starstim31_best.pth`
+  - `checkpoints/hierarchical/lab_prior_starstim31_best_fdn.pt`
+- The interactive live-demo controller, numeric trigger mapping, unseen/shared
+  ATMS mode, and per-session output layout are implemented.
+- The conservative unseen-participant default is low-level only. Shared-token
+  high-level reconstruction is available but remains explicitly experimental
+  until its downstream diffusion output is evaluated end to end.
+- NIC2 stream discovery, channel order, marker timing, browser rendering, and
+  reconnect behavior still require an in-room hardware rehearsal.
+- Full offline assessor use still requires the CLIP ViT-L/14 backbone weights to
+  be cached locally.
 
 ## Current Pipeline State
 
 ```text
 P07 EEG epoch -> Starstim31 ATMS embedding              works
-Starstim32 live epoch -> offline-style 31x250 input     wired for native lab-live
+Starstim32 live/raw-replay epoch -> live-style 31x250 input wired for native lab-live/lab-replay
 SDXL VAE loading from cache                             works
 target/low/high images -> VA/six ratings + final summary figure wired, needs CLIP backbone cache
-P07 EEG epoch -> low-level image                        blocked by missing native low-level checkpoint
-ATMS embedding -> high-level semantic reconstruction    blocked by missing Starstim31 diffusion prior
-GUI end-to-end display                                  blocked until the two project checkpoints above exist and are wired in
+P07 EEG epoch -> low-level image                        works with native lab checkpoint
+ATMS embedding -> high-level semantic reconstruction    works for known IDs; shared unseen mode is experimental
+GUI end-to-end replay                                   works
+GUI live setup / Arm / session lifecycle                implemented; hardware-room validation remains
 ```
+
+## Reproducing The Lab Checkpoints
+
+Run these from:
+
+```bash
+cd /home/psycontrol/Marco/Maryam/Hierarchical_EEG2Image_Reconstruction
+```
+
+First build the raw/live-style lab cache. This reads `.easy`, drops `Fz`,
+average-references, resamples to 250 Hz, baseline-corrects, crops `0..1 s`,
+and writes a manifest whose `epoch_index` values match the new cache:
+
+```bash
+/home/psycontrol/miniforge3/envs/BCI/bin/python scripts/build_lab_live_preproc_cache.py
+```
+
+Then train the native Starstim31 low-level checkpoint:
+
+```bash
+/home/psycontrol/miniforge3/envs/BCI/bin/python scripts/train_lab_low_level_vae.py \
+  --experiment-name starstim31_livepreproc_sdxlvae \
+  --heldout-subject P07 \
+  --device cuda:0
+```
+
+Expected stable output:
+
+```text
+models/lab_low_level/starstim31_livepreproc/best.pth
+```
+
+Then train the Starstim31-conditioned diffusion prior. This keeps the existing
+`best_model.pth` ATMS checkpoint frozen and trains the prior against
+`lab_vith14_features.pt`:
+
+```bash
+/home/psycontrol/miniforge3/envs/BCI/bin/python scripts/train_lab_diffusion_prior.py \
+  --experiment-name starstim31_livepreproc_fdn \
+  --heldout-subject P07 \
+  --device cuda:0
+```
+
+With `--heldout-subject P07`, the training set uses all usable lab trials from
+the other subjects and evaluation uses usable P07 trials. That is the
+no-subject-leakage setup for testing later on P07.
+
+Expected stable output:
+
+```text
+models/lab_prior/starstim31_livepreproc/lab_prior_best_fdn.pt
+```
+
+After training, copy or point realtime to:
+
+```text
+checkpoints/hierarchical/lab_low_level_starstim31_best.pth
+checkpoints/hierarchical/lab_prior_starstim31_best_fdn.pt
+```
+
+Native lab high-level is now allowed when `--lab-prior-checkpoint` is provided.
+For P07, use `--subject-id 4` so high-level conditioning matches the manifest
+subject ID.
 
 ## Useful Verification Commands
 
@@ -159,7 +241,7 @@ from pathlib import Path
 from maryam_rt.integration.lab_replay import LabReplayConfig, load_lab_trials
 from maryam_rt.integration.starstim31_atms import Starstim31ATMSEmbedder
 
-trial = load_lab_trials(LabReplayConfig(data_root=Path("data"), subject="P07"))[0]
+trial = load_lab_trials(LabReplayConfig(data_root=Path("data"), subject="P07", max_trials=1))[0]
 embedder = Starstim31ATMSEmbedder(
     Path("checkpoints/hierarchical/atms_starstim31_10sub_best.pth"),
     device="cpu",

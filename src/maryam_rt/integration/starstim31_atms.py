@@ -282,10 +282,19 @@ class Starstim31ATMSEmbedder:
         self.num_subjects = num_subjects
 
     @torch.inference_mode()
-    def embed(self, epoch_lab31: np.ndarray | Tensor, subject_id: int) -> Tensor:
-        if subject_id < 0 or subject_id >= self.num_subjects:
+    def embed(self, epoch_lab31: np.ndarray | Tensor, subject_id: int | None) -> Tensor:
+        """Embed a known subject, or use the checkpoint's trained shared token.
+
+        ``subject_id=None`` (or the explicit sentinel ``num_subjects``) selects
+        ``SubjectEmbedding.shared_embedding``.  This is the only non-arbitrary
+        conditioning available for a participant who was not assigned a
+        checkpoint subject row.
+        """
+        resolved_subject_id = self.num_subjects if subject_id is None else int(subject_id)
+        if resolved_subject_id < 0 or resolved_subject_id > self.num_subjects:
             raise ValueError(
-                f"Starstim31 ATMS subject_id {subject_id} is outside checkpoint range 0..{self.num_subjects - 1}."
+                f"Starstim31 ATMS subject_id {resolved_subject_id} is outside known range "
+                f"0..{self.num_subjects - 1} and shared sentinel {self.num_subjects}."
             )
         if isinstance(epoch_lab31, np.ndarray):
             x = torch.from_numpy(np.asarray(epoch_lab31, dtype=np.float32))
@@ -295,15 +304,28 @@ class Starstim31ATMSEmbedder:
             x = x.unsqueeze(0)
         if tuple(x.shape[1:]) != (31, 250):
             raise ValueError(f"Expected Starstim31 epoch shaped (B, 31, 250), got {tuple(x.shape)}.")
-        subject_ids = torch.full((x.shape[0],), subject_id, dtype=torch.long, device=self.device_name)
+        subject_ids = torch.full(
+            (x.shape[0],),
+            resolved_subject_id,
+            dtype=torch.long,
+            device=self.device_name,
+        )
         return self.model(x.to(self.device_name), subject_ids).detach().cpu()
 
-    def save_embedding(self, epoch_lab31: np.ndarray | Tensor, subject_id: int, output_path: Path) -> dict[str, Any]:
+    def save_embedding(
+        self,
+        epoch_lab31: np.ndarray | Tensor,
+        subject_id: int | None,
+        output_path: Path,
+    ) -> dict[str, Any]:
         embedding = self.embed(epoch_lab31, subject_id=subject_id)
+        resolved_subject_id = self.num_subjects if subject_id is None else int(subject_id)
+        subject_mode = "shared_unseen" if resolved_subject_id == self.num_subjects else "known"
         output_path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "embedding": embedding,
-            "subject_id": subject_id,
+            "subject_id": resolved_subject_id,
+            "subject_mode": subject_mode,
             "checkpoint_path": str(self.checkpoint_path),
             "model": "starstim31_atms",
         }
@@ -311,6 +333,7 @@ class Starstim31ATMSEmbedder:
         return {
             "path": str(output_path),
             "shape": list(embedding.shape),
-            "subject_id": subject_id,
+            "subject_id": resolved_subject_id,
+            "subject_mode": subject_mode,
             "checkpoint_path": str(self.checkpoint_path),
         }

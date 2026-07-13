@@ -5,8 +5,10 @@ import pytest
 import torch
 
 from maryam_rt.integration.lab_replay import (
+    LabReplayConfig,
     STARSTIM_31_CHANNELS as LAB_STARSTIM_31_CHANNELS,
     adapt_starstim31_to_things63,
+    load_lab_trials,
 )
 from maryam_rt.integration.marker_payload import parse_marker_payload
 from maryam_rt.integration.resample import (
@@ -104,6 +106,40 @@ def test_starstim_live_preprocessor_converts_500hz_starstim32_to_31x250() -> Non
     np.testing.assert_allclose(processed.mean(axis=0, dtype=np.float64), 0.0, atol=1e-4)
 
 
+def test_raw_lab_replay_uses_live_preprocessing_contract(tmp_path) -> None:
+    subject_dir = tmp_path / "P01"
+    subject_dir.mkdir()
+    rows = []
+    for sample in range(800):
+        eeg_nv = [str((channel * 1000) + sample) for channel in range(32)]
+        rows.append("\t".join(eeg_nv + ["0", "0", "0", "0", str(sample)]))
+    (subject_dir / "recording.easy").write_text("\n".join(rows) + "\n")
+
+    finetune_dir = tmp_path / "derived" / "finetune"
+    finetune_dir.mkdir(parents=True)
+    (finetune_dir / "lab_target_manifest.tsv").write_text(
+        "target_index\ttrigger\tcategory\texact_image_path\tsplit\n"
+        "0\t1001\ttest_object\t\ttrain\n"
+    )
+    (finetune_dir / "lab_finetune_split_manifest.tsv").write_text(
+        "subject_folder\tepoch_index\ttarget_index\ttrigger\tcategory\tsplit\t"
+        "lab_subject_id\tusable_for_finetune\teeg_sample\n"
+        "P01\t0\t0\t1001\ttest_object\ttrain\t4\tTrue\t200\n"
+    )
+
+    trials = load_lab_trials(LabReplayConfig(data_root=tmp_path, replay_source="raw", subject="P01"))
+
+    assert len(trials) == 1
+    trial = trials[0]
+    assert trial.replay_source == "raw"
+    assert trial.raw_start_sample == 100
+    assert trial.raw_samples == 600
+    assert trial.epoch_lab31.shape == (31, 250)
+    assert trial.epoch_model.shape == (31, 250)
+    assert trial.lab_subject_id == 4
+    np.testing.assert_allclose(trial.epoch_lab31.mean(axis=0, dtype=np.float64), 0.0, atol=1e-4)
+
+
 def test_starstim_preprocessing_steps_match_offline_contract() -> None:
     common = np.linspace(-0.5, 0.5, 600, dtype=np.float32)
     raw = np.arange(32, dtype=np.float32)[:, None] * 0.01 + common[None, :]
@@ -128,6 +164,7 @@ class _FakeATMSModel:
     def __call__(self, x: torch.Tensor, subject_ids: torch.Tensor) -> torch.Tensor:
         assert tuple(x.shape[1:]) == (31, 250)
         assert tuple(subject_ids.shape) == (x.shape[0],)
+        self.last_subject_ids = subject_ids.detach().cpu().clone()
         return torch.ones((x.shape[0], 1024), device=x.device)
 
 
@@ -140,7 +177,13 @@ def test_starstim31_atms_embedder_shape_contract_without_checkpoint() -> None:
     out = embedder.embed(np.zeros((31, 250), dtype=np.float32), subject_id=4)
     assert tuple(out.shape) == (1, 1024)
 
-    with pytest.raises(ValueError, match="outside checkpoint range"):
-        embedder.embed(np.zeros((31, 250), dtype=np.float32), subject_id=11)
+    shared = embedder.embed(np.zeros((31, 250), dtype=np.float32), subject_id=11)
+    assert tuple(shared.shape) == (1, 1024)
+    assert embedder.model.last_subject_ids.tolist() == [11]
+    embedder.embed(np.zeros((31, 250), dtype=np.float32), subject_id=None)
+    assert embedder.model.last_subject_ids.tolist() == [11]
+
+    with pytest.raises(ValueError, match="outside known range"):
+        embedder.embed(np.zeros((31, 250), dtype=np.float32), subject_id=12)
     with pytest.raises(ValueError, match="Expected Starstim31 epoch"):
         embedder.embed(np.zeros((32, 250), dtype=np.float32), subject_id=4)
