@@ -35,6 +35,9 @@ def build_command(config_path: Path) -> list[str]:
 
     low_level = _required_path(config, "low_level_checkpoint")
     trigger_map = _required_path(config, "legacy_trigger_map")
+    eeg_unit_fallback = str(config.get("eeg_unit_fallback") or "microvolts")
+    if eeg_unit_fallback not in {"volts", "millivolts", "microvolts", "nanovolts"}:
+        raise SystemExit(f"Unsupported eeg_unit_fallback in demo config: {eeg_unit_fallback!r}")
     command = [
         sys.executable,
         str(PROJECT_ROOT / "scripts" / "run_realtime_gui.py"),
@@ -54,6 +57,8 @@ def build_command(config_path: Path) -> list[str]:
         str(config.get("preferred_eeg_stream") or "eeg_recon_pyexp-EEG"),
         "--marker-stream-name",
         str(config.get("preferred_marker_stream") or "eeg_recon_pyexp"),
+        "--eeg-unit-fallback",
+        eeg_unit_fallback,
         "--lab-low-level-checkpoint",
         str(low_level),
         "--lab-model-channels",

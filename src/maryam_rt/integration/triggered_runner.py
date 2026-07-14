@@ -41,6 +41,8 @@ class TriggeredRunnerConfig:
     trigger_cooldown_ms: float = 0.0
     eeg_sampling_rate: float = 1000.0
     eeg_channels: int = 64
+    eeg_convert_to_microvolts: bool = False
+    eeg_unit_fallback: str | None = None
     ring_buffer_seconds: float = 10.0
     poll_interval_ms: float = 5.0
     connect_timeout_s: float | None = None
@@ -108,6 +110,8 @@ class TriggeredReconstructionRunner:
                 channel_count=config.eeg_channels,
                 sampling_rate=config.eeg_sampling_rate,
                 ring_buffer_seconds=config.ring_buffer_seconds,
+                convert_to_microvolts=config.eeg_convert_to_microvolts,
+                unit_fallback=config.eeg_unit_fallback,
             )
         )
         self.marker_inlet = marker_inlet or MarkerInletWrapper(
@@ -615,6 +619,8 @@ class TriggeredReconstructionRunner:
             "channel_order_confirmed": snapshot["status"]["channel_order_confirmed"],
             "expected_eeg_channels": self.config.eeg_channels,
             "expected_eeg_sampling_rate": self.config.eeg_sampling_rate,
+            "eeg_input_unit": getattr(self.eeg_inlet, "input_unit", None),
+            "eeg_output_unit": getattr(self.eeg_inlet, "output_unit", None),
             "pre_event_ms": self.config.pre_event_ms,
             "post_event_ms": self.config.post_event_ms,
             "trials_received": snapshot["status"]["trials_received"],
@@ -696,6 +702,8 @@ class TriggeredReconstructionRunner:
             "epoch_end_lsl": end_lsl,
             "epoch_samples": int(epoch.shape[1]),
             "processed_shape": list(processed.shape),
+            "eeg_input_unit": getattr(self.eeg_inlet, "input_unit", None),
+            "eeg_output_unit": getattr(self.eeg_inlet, "output_unit", None),
             "artifact_valid": bool(is_valid),
             "image_id": parsed.image_id,
             "image_path": None if target is None else str(target.image_path),

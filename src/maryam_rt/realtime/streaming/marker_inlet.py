@@ -10,7 +10,7 @@ from typing import Any, Deque, Optional
 
 try:
     from pylsl import StreamInfo, StreamInlet, resolve_streams
-except ModuleNotFoundError:  # Allows marker/lifecycle tests in a minimal environment.
+except (ModuleNotFoundError, RuntimeError):  # Allows marker/lifecycle tests without a working liblsl.
     StreamInfo = Any  # type: ignore[misc,assignment]
     StreamInlet = None  # type: ignore[assignment]
     resolve_streams = None  # type: ignore[assignment]

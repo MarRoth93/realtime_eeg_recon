@@ -78,6 +78,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ring-buffer-seconds", type=float, default=10.0, help="EEG ring buffer duration.")
     parser.add_argument("--image-root", default=None, help="Optional image root used to resolve image_id markers.")
     parser.add_argument("--eeg-sampling-rate", type=float, default=None, help="Incoming realtime EEG sampling rate. Defaults to 500 for native lab-live, otherwise 1000.")
+    parser.add_argument(
+        "--eeg-unit-fallback",
+        choices=["volts", "millivolts", "microvolts", "nanovolts"],
+        default=None,
+        help="Input unit used by lab-live when the LSL stream has no channel-unit metadata. Defaults to microvolts.",
+    )
 
     parser.add_argument(
         "--data-root",
@@ -233,6 +239,8 @@ def apply_mode_defaults(args: argparse.Namespace) -> None:
         args.pre_event_ms = 200.0 if native_lab_live or raw_lab_replay else 0.0
     if args.post_event_ms is None:
         args.post_event_ms = 1000.0
+    if args.eeg_unit_fallback is None and args.mode == "lab-live":
+        args.eeg_unit_fallback = "microvolts"
     if args.participant_mode == "auto":
         args.participant_mode = "unseen" if args.mode == "lab-live" else "known"
     if args.subject_id is None and args.participant_mode == "known":
@@ -532,6 +540,8 @@ def _run_main() -> int:
                     trigger_cooldown_ms=args.trigger_cooldown_ms,
                     eeg_sampling_rate=args.eeg_sampling_rate,
                     eeg_channels=eeg_channels,
+                    eeg_convert_to_microvolts=args.mode == "lab-live",
+                    eeg_unit_fallback=args.eeg_unit_fallback if args.mode == "lab-live" else None,
                     poll_interval_ms=args.poll_interval_ms,
                     ring_buffer_seconds=args.ring_buffer_seconds,
                     image_root=args.image_root,

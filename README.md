@@ -332,6 +332,11 @@ Native `lab-live` defaults to `--eeg-sampling-rate 500`, `--pre-event-ms 200`,
 and `--post-event-ms 1000`. Override those only if the NIC2 LSL stream is
 configured differently.
 
+Live EEG is normalized to microvolts before buffering. Per-channel LSL `unit`
+metadata is authoritative when present; otherwise `lab-live` uses
+`--eeg-unit-fallback microvolts`. Set the fallback to `nanovolts`, `millivolts`,
+or `volts` if NIC2 omits metadata and streams one of those units.
+
 Expected Starstim32 channel order:
 
 ```text

@@ -11,12 +11,45 @@ import numpy as np
 
 try:
     from pylsl import StreamInfo, StreamInlet, resolve_streams
-except ModuleNotFoundError:  # Allows buffer/lifecycle tests in a minimal environment.
+except (ModuleNotFoundError, RuntimeError):  # Allows buffer/lifecycle tests without a working liblsl.
     StreamInfo = Any  # type: ignore[misc,assignment]
     StreamInlet = None  # type: ignore[assignment]
     resolve_streams = None  # type: ignore[assignment]
 
 from .timestamp_sync import TimestampSyncConfig, TimestampSynchronizer
+
+
+_MICROVOLT_SCALE_BY_UNIT = {
+    "volts": 1_000_000.0,
+    "millivolts": 1_000.0,
+    "microvolts": 1.0,
+    "nanovolts": 0.001,
+}
+
+_UNIT_ALIASES = {
+    "v": "volts",
+    "volt": "volts",
+    "volts": "volts",
+    "mv": "millivolts",
+    "millivolt": "millivolts",
+    "millivolts": "millivolts",
+    "uv": "microvolts",
+    "microv": "microvolts",
+    "microvolt": "microvolts",
+    "microvolts": "microvolts",
+    "nv": "nanovolts",
+    "nanovolt": "nanovolts",
+    "nanovolts": "nanovolts",
+}
+
+
+def _canonical_eeg_unit(unit: str) -> str:
+    normalized = unit.strip().lower().replace("µ", "u").replace("μ", "u")
+    canonical = _UNIT_ALIASES.get(normalized)
+    if canonical is None:
+        supported = ", ".join(_MICROVOLT_SCALE_BY_UNIT)
+        raise ValueError(f"Unsupported EEG unit {unit!r}; expected one of: {supported}.")
+    return canonical
 
 
 @dataclass
@@ -36,6 +69,8 @@ class LSLInletConfig:
     channel_count: Optional[int] = None
     sampling_rate: Optional[float] = None
     dtype: np.dtype = np.float32
+    convert_to_microvolts: bool = False
+    unit_fallback: Optional[str] = None
     enable_time_sync: bool = True
     time_sync_interval: float = 0.5
     timestamp_sync_config: Optional[TimestampSyncConfig] = None
@@ -59,6 +94,8 @@ class LSLInletConfig:
             raise ValueError("max_lsl_buffer_seconds must be > 0.")
         if self.time_sync_interval < 0:
             raise ValueError("time_sync_interval must be >= 0.")
+        if self.unit_fallback is not None:
+            _canonical_eeg_unit(self.unit_fallback)
 
 
 class RingBuffer:
@@ -173,6 +210,9 @@ class LSLInletWrapper:
         self._stream_type: Optional[str] = None
         self._source_id: Optional[str] = None
         self._channel_labels: tuple[str, ...] = ()
+        self._input_unit: Optional[str] = None
+        self._output_unit: Optional[str] = "microvolts" if config.convert_to_microvolts else None
+        self._unit_scale = 1.0
         self._last_lsl_timestamp: Optional[float] = None
         self._last_sample_monotonic: Optional[float] = None
         self._connection_generation = 0
@@ -224,6 +264,14 @@ class LSLInletWrapper:
     @property
     def channel_labels(self) -> tuple[str, ...]:
         return self._channel_labels
+
+    @property
+    def input_unit(self) -> Optional[str]:
+        return self._input_unit
+
+    @property
+    def output_unit(self) -> Optional[str]:
+        return self._output_unit
 
     @property
     def buffer_seconds(self) -> float:
@@ -464,6 +512,7 @@ class LSLInletWrapper:
         self._stream_type = str(info.type())
         self._source_id = str(info.source_id())
         self._channel_labels = self._read_channel_labels(info)
+        self._configure_unit_conversion(self._read_channel_units(info))
         capacity = max(
             self._config.chunk_size, int(round(self._sampling_rate * self._config.ring_buffer_seconds))
         )
@@ -487,6 +536,49 @@ class LSLInletWrapper:
         except Exception:
             return ()
         return tuple(labels)
+
+    @staticmethod
+    def _read_channel_units(info: StreamInfo) -> tuple[str, ...]:
+        units: list[str] = []
+        try:
+            desc = info.desc()
+            channel = desc.child("channels").child("channel")
+            if not (
+                channel.child_value("label")
+                or channel.child_value("name")
+                or channel.child_value("unit")
+            ):
+                channel = desc.child("channel")
+            for _ in range(int(info.channel_count())):
+                units.append(str(channel.child_value("unit") or ""))
+                channel = channel.next_sibling()
+        except Exception:
+            return ()
+        return tuple(units)
+
+    def _configure_unit_conversion(self, channel_units: Sequence[str]) -> None:
+        if not self._config.convert_to_microvolts:
+            return
+
+        declared = [unit for unit in channel_units if unit.strip()]
+        if declared and len(declared) != len(channel_units):
+            raise ValueError("EEG stream declares units for only some channels.")
+
+        canonical_units = {_canonical_eeg_unit(unit) for unit in declared}
+        if len(canonical_units) > 1:
+            raise ValueError(f"EEG stream mixes channel units: {sorted(canonical_units)}.")
+
+        if canonical_units:
+            input_unit = canonical_units.pop()
+        elif self._config.unit_fallback is not None:
+            input_unit = _canonical_eeg_unit(self._config.unit_fallback)
+        else:
+            raise ValueError(
+                "EEG stream does not declare channel units and no unit_fallback was configured."
+            )
+
+        self._input_unit = input_unit
+        self._unit_scale = _MICROVOLT_SCALE_BY_UNIT[input_unit]
 
     def _create_inlet(self, info: StreamInfo) -> StreamInlet:
         if StreamInlet is None:
@@ -599,7 +691,10 @@ class LSLInletWrapper:
                 f"Unexpected sample shape {data.shape} for {self._channel_count} channels."
             )
 
-        data_channels = np.ascontiguousarray(data_samples.T)
+        data_channels = np.ascontiguousarray(
+            data_samples.T * self._unit_scale,
+            dtype=self._config.dtype,
+        )
         with self._data_ready:
             if self._ring is None:
                 return
