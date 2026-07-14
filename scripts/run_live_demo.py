@@ -26,6 +26,34 @@ def _required_path(config: dict[str, object], key: str) -> Path:
     return path
 
 
+def _optional_path(config: dict[str, object], key: str) -> Path | None:
+    value = str(config.get(key) or "").strip()
+    if not value:
+        return None
+    path = _project_path(value)
+    if not path.exists():
+        raise SystemExit(f"Demo asset does not exist for {key!r}: {path}")
+    return path
+
+
+def _append_lab_preprocessing(command: list[str], config: dict[str, object]) -> None:
+    """Forward the derived-contract preprocessing options from the demo config."""
+    if config.get("bandpass_l_freq") is not None:
+        command.extend(["--lab-bandpass-l-freq", str(float(config["bandpass_l_freq"]))])
+    if config.get("bandpass_h_freq") is not None:
+        command.extend(["--lab-bandpass-h-freq", str(float(config["bandpass_h_freq"]))])
+    if config.get("filter_order") is not None:
+        command.extend(["--lab-filter-order", str(int(config["filter_order"]))])
+    if config.get("reject_peak_to_peak_uv") is not None:
+        command.extend(["--lab-reject-uv", str(float(config["reject_peak_to_peak_uv"]))])
+    ica_operator = _optional_path(config, "ica_operator")
+    if ica_operator is not None:
+        command.extend(["--lab-ica-operator", str(ica_operator)])
+    whitening_matrix = _optional_path(config, "whitening_matrix")
+    if whitening_matrix is not None:
+        command.extend(["--lab-whitening-matrix", str(whitening_matrix)])
+
+
 def build_command(config_path: Path) -> list[str]:
     if not config_path.exists():
         raise SystemExit(f"Demo config not found: {config_path}")
@@ -98,6 +126,7 @@ def build_command(config_path: Path) -> list[str]:
         )
     else:
         command.append("--disable-high-level")
+    _append_lab_preprocessing(command, config)
     return command
 
 

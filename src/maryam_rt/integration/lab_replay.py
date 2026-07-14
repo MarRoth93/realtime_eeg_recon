@@ -18,8 +18,9 @@ from PIL import Image
 from sklearn.discriminant_analysis import _cov
 
 from maryam_rt.gui.monitor import RuntimeMonitorState
+from maryam_rt.integration.lab_calibration import compute_mvnn_whitener_custom, load_operator
 from maryam_rt.integration.montage import STARSTIM_31_CHANNELS, STARSTIM_32_CHANNELS, THINGS_63_CHANNELS
-from maryam_rt.integration.starstim_preprocessing import StarstimLivePreprocessor
+from maryam_rt.integration.starstim_preprocessing import StarstimLivePreprocessor, peak_to_peak
 
 if TYPE_CHECKING:
     from maryam_rt.integration.assessor_ratings import AssessorRatingWriter
@@ -50,6 +51,14 @@ class LabReplayConfig:
     lab_whitening_split: str = "train"
     lab_whitening_cache: Optional[Path] = None
     lab_whitening_subject: Optional[str] = None
+    lab_whitening_method: str = "custom"
+    lab_whitening_matrix: Optional[Path] = None
+    lab_whitening_first_block: Optional[int] = None
+    lab_bandpass_l_freq: Optional[float] = None
+    lab_bandpass_h_freq: Optional[float] = None
+    lab_filter_order: int = 4
+    lab_ica_operator: Optional[Path] = None
+    lab_reject_peak_to_peak_uv: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -73,6 +82,8 @@ class LabTrial:
     whitening_mode: str = "none"
     whitening_cache_path: Optional[Path] = None
     whitening_source_split: Optional[str] = None
+    artifact_rejected: bool = False
+    peak_to_peak_uv: Optional[float] = None
 
 
 def _read_tsv(path: Path) -> list[dict[str, str]]:
@@ -153,7 +164,12 @@ def _lab_whitening_cache_path(config: LabReplayConfig) -> Path:
         window = f"{int(round(config.raw_tmin * 1000))}ms_{int(round(config.raw_tmax * 1000))}ms"
     else:
         window = "derived250hz"
-    stem = f"lab_{config.replay_source}_{subject}_{config.lab_whitening_split}_mvnn_{window}"
+    scope = (
+        f"first{config.lab_whitening_first_block}"
+        if config.lab_whitening_first_block is not None
+        else config.lab_whitening_split
+    )
+    stem = f"lab_{config.replay_source}_{subject}_{scope}_{config.lab_whitening_method}_mvnn_{window}"
     return cache_dir / f"{stem}.npy"
 
 
@@ -232,19 +248,37 @@ def _model_epoch(config: LabReplayConfig, epoch_lab31: np.ndarray, ch_names: lis
     raise ValueError(f"Unsupported lab adapter: {config.adapter}")
 
 
-def _compute_lab_mvnn_whitener(trials: Sequence[LabTrial]) -> np.ndarray:
+def _calibration_epochs(trials: Sequence[LabTrial], first_block: Optional[int]) -> np.ndarray:
+    """Stack the usable, non-rejected 31x250 model epochs used to fit a whitener.
+
+    ``first_block`` treats the leading N trials as this subject's calibration
+    ("train") block; the rest of the session then reuses the fitted matrix.
+    """
+    candidates = list(trials)
+    if first_block is not None:
+        # The first block is an acquisition window; artifacts inside it are
+        # dropped rather than back-filled from later trials.
+        candidates = candidates[:first_block]
     usable = [
         trial
-        for trial in trials
-        if trial.usable_for_finetune and trial.epoch_model.shape == (31, 250)
+        for trial in candidates
+        if trial.usable_for_finetune
+        and not trial.artifact_rejected
+        and trial.epoch_model.shape == (31, 250)
     ]
-    if not usable:
-        raise ValueError("Lab MVNN whitening needs at least one usable 31x250 finetune trial.")
+    if len(usable) < 2:
+        raise ValueError(
+            "Lab MVNN whitening needs at least two usable 31x250 calibration trials "
+            f"(got {len(usable)})."
+        )
+    return np.stack([trial.epoch_model for trial in usable]).astype(np.float64)
 
-    covariances = np.empty((len(usable), 31, 31), dtype=np.float32)
-    for index, trial in enumerate(usable):
-        covariances[index] = _cov(trial.epoch_model.T, shrinkage="auto")
 
+def _compute_lab_mvnn_whitener_shrinkage(epochs: np.ndarray) -> np.ndarray:
+    """Per-trial shrinkage covariances averaged, then ``sigma ** -0.5``."""
+    covariances = np.empty((epochs.shape[0], 31, 31), dtype=np.float64)
+    for index in range(epochs.shape[0]):
+        covariances[index] = _cov(epochs[index].T, shrinkage="auto")
     sigma_tot = covariances.mean(axis=0)
     sigma_inv = scipy.linalg.fractional_matrix_power(sigma_tot, -0.5)
     sigma_inv = np.asarray(np.real_if_close(sigma_inv), dtype=np.float32)
@@ -253,6 +287,19 @@ def _compute_lab_mvnn_whitener(trials: Sequence[LabTrial]) -> np.ndarray:
     if not np.isfinite(sigma_inv).all():
         raise ValueError("Lab MVNN whitener contains non-finite values.")
     return sigma_inv
+
+
+def _compute_lab_mvnn_whitener(
+    trials: Sequence[LabTrial],
+    method: str = "custom",
+    first_block: Optional[int] = None,
+) -> np.ndarray:
+    epochs = _calibration_epochs(trials, first_block)
+    if method == "custom":
+        return compute_mvnn_whitener_custom(epochs)
+    if method == "shrinkage":
+        return _compute_lab_mvnn_whitener_shrinkage(epochs)
+    raise ValueError(f"Unsupported lab whitening method: {method}. Use 'custom' or 'shrinkage'.")
 
 
 def _apply_lab_whitener(epoch: np.ndarray, sigma_inv: np.ndarray) -> np.ndarray:
@@ -272,6 +319,12 @@ def _load_base_lab_trials(config: LabReplayConfig) -> list[LabTrial]:
 
 
 def _load_or_build_lab_whitener(config: LabReplayConfig) -> tuple[np.ndarray, Path]:
+    # 1. An explicitly supplied whitening matrix always wins (frozen per subject).
+    if config.lab_whitening_matrix is not None:
+        sigma_inv = load_operator(config.lab_whitening_matrix, expected_channels=31)
+        return sigma_inv, config.lab_whitening_matrix
+
+    # 2. A previously cached matrix for this subject/scope is reused verbatim.
     cache_path = _lab_whitening_cache_path(config)
     if cache_path.exists():
         sigma_inv = np.load(cache_path).astype(np.float32)
@@ -279,31 +332,44 @@ def _load_or_build_lab_whitener(config: LabReplayConfig) -> tuple[np.ndarray, Pa
             raise ValueError(f"Cached lab MVNN whitener must be 31x31, got {sigma_inv.shape}: {cache_path}")
         return sigma_inv, cache_path
 
+    # 3. Otherwise compute it from the calibration ("first block") trials. When a
+    # first block is requested we take the leading trials in manifest order
+    # regardless of split; otherwise we fit on the configured split.
+    first_block = config.lab_whitening_first_block
     calibration_config = replace(
         config,
-        split=config.lab_whitening_split,
+        split="all" if first_block is not None else config.lab_whitening_split,
         subject=config.lab_whitening_subject or config.subject,
-        max_trials=None,
+        max_trials=first_block,
         start_trial=0,
         sleep_seconds=0.0,
         lab_whitening="none",
         lab_whitening_cache=None,
+        lab_whitening_matrix=None,
     )
     calibration_trials = _load_base_lab_trials(calibration_config)
-    sigma_inv = _compute_lab_mvnn_whitener(calibration_trials)
+    sigma_inv = _compute_lab_mvnn_whitener(
+        calibration_trials,
+        method=config.lab_whitening_method,
+        first_block=first_block,
+    )
     np.save(cache_path, sigma_inv)
 
     metadata = {
         "mode": "lab_mvnn",
+        "method": config.lab_whitening_method,
         "cache_path": str(cache_path),
         "replay_source": config.replay_source,
         "subject": calibration_config.subject,
         "split": calibration_config.split,
+        "first_block": first_block,
         "usable_trial_count": int(
             sum(
                 1
                 for trial in calibration_trials
-                if trial.usable_for_finetune and trial.epoch_model.shape == (31, 250)
+                if trial.usable_for_finetune
+                and not trial.artifact_rejected
+                and trial.epoch_model.shape == (31, 250)
             )
         ),
         "raw_window_seconds": [float(config.raw_tmin), float(config.raw_tmax)],
@@ -348,6 +414,14 @@ def _trial_from_row(
 ) -> LabTrial:
     target_index = int(row["target_index"])
     target_row = target_by_index.get(target_index, {})
+    epoch_model = _model_epoch(config, epoch_lab31, ch_names)
+    # Rejection is measured on the pre-whitening model epoch, matching where the
+    # offline pipeline rejects trials (reject=250 µV at epoching, before MVNN).
+    ptp = peak_to_peak(epoch_model)
+    rejected = (
+        config.lab_reject_peak_to_peak_uv is not None
+        and ptp > config.lab_reject_peak_to_peak_uv
+    )
     return LabTrial(
         trial_index=trial_index,
         epoch_index=int(row["epoch_index"]),
@@ -358,13 +432,15 @@ def _trial_from_row(
         category=row.get("category") or target_row.get("category", ""),
         split=row.get("split", ""),
         epoch_lab31=epoch_lab31,
-        epoch_model=_model_epoch(config, epoch_lab31, ch_names),
+        epoch_model=epoch_model,
         image_path=_resolve_image_path({**target_row, **row}),
         usable_for_finetune=str(row.get("usable_for_finetune", "true")).lower() == "true",
         replay_source=replay_source,
         raw_easy_path=raw_easy_path,
         raw_start_sample=raw_start_sample,
         raw_samples=raw_samples,
+        artifact_rejected=rejected,
+        peak_to_peak_uv=float(ptp),
     )
 
 
@@ -407,6 +483,12 @@ def load_lab_trials_from_derived(config: LabReplayConfig) -> list[LabTrial]:
     return trials
 
 
+def _load_lab_ica_operator(config: LabReplayConfig) -> Optional[np.ndarray]:
+    if config.lab_ica_operator is None:
+        return None
+    return load_operator(config.lab_ica_operator, expected_channels=31)
+
+
 def load_lab_trials_from_raw(config: LabReplayConfig) -> list[LabTrial]:
     split_rows, target_by_index, _split_path = _load_split_rows(config)
     selected_rows = _iter_filtered_split_rows(config, split_rows)
@@ -417,6 +499,7 @@ def load_lab_trials_from_raw(config: LabReplayConfig) -> list[LabTrial]:
     trials: list[LabTrial] = []
     preprocessors: dict[str, StarstimLivePreprocessor] = {}
     easy_paths: dict[str, Path] = {}
+    ica_operator = _load_lab_ica_operator(config)
 
     for source_trial_index, row in indexed_rows:
         subject = row.get("subject_folder", "")
@@ -441,6 +524,11 @@ def load_lab_trials_from_raw(config: LabReplayConfig) -> list[LabTrial]:
                 tmin=config.raw_tmin,
                 tmax=config.raw_tmax,
                 ch_names=tuple(info_channels or STARSTIM_32_CHANNELS),
+                l_freq=config.lab_bandpass_l_freq,
+                h_freq=config.lab_bandpass_h_freq,
+                filter_order=config.lab_filter_order,
+                ica_operator=ica_operator,
+                reject_peak_to_peak_uv=config.lab_reject_peak_to_peak_uv,
             )
             preprocessors[subject] = preprocessor
 
@@ -560,7 +648,9 @@ class LabReplayRunner:
                     "label": f"trigger {trial.trigger}",
                     "event_name": str(trial.trigger),
                     "raw_value": str(trial.trigger),
-                    "status": "accepted" if trial.usable_for_finetune else "artifact_review",
+                    "status": "accepted"
+                    if trial.usable_for_finetune and not trial.artifact_rejected
+                    else "artifact_review",
                     "image_id": str(trial.target_index),
                     "subject": trial.subject,
                     "split": trial.split,
@@ -605,6 +695,8 @@ class LabReplayRunner:
             "image_path": None if trial.image_path is None else str(trial.image_path),
             "low_level_path": str(low_path),
             "whitening_mode": trial.whitening_mode,
+            "artifact_rejected": trial.artifact_rejected,
+            "peak_to_peak_uv": trial.peak_to_peak_uv,
         }
         if trial.whitening_cache_path is not None:
             metadata["whitening_cache_path"] = str(trial.whitening_cache_path)

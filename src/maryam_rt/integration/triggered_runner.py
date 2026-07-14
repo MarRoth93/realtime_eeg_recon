@@ -674,6 +674,7 @@ class TriggeredReconstructionRunner:
         start_lsl: float,
         end_lsl: float,
     ) -> None:
+        peak_to_peak_uv: float | None = None
         if self.epoch_preprocessor is None:
             preprocessor = PreprocessingPipeline(
                 n_channels=self.config.eeg_channels,
@@ -681,8 +682,17 @@ class TriggeredReconstructionRunner:
             )
             processed, is_valid = preprocessor.process(epoch)
         else:
-            processed = self._resolve_epoch_preprocessor()(epoch)
-            is_valid = True
+            from maryam_rt.integration.starstim_preprocessing import StarstimLivePreprocessor
+
+            resolved = self._resolve_epoch_preprocessor()
+            if isinstance(resolved, StarstimLivePreprocessor):
+                result = resolved.process(epoch)
+                processed = result.epoch
+                peak_to_peak_uv = result.peak_to_peak_uv
+                is_valid = not result.rejected
+            else:
+                processed = resolved(epoch)
+                is_valid = True
         stem = self._build_stem(event)
         parsed = payload
         target = self.target_resolver.resolve(parsed)
@@ -705,6 +715,7 @@ class TriggeredReconstructionRunner:
             "eeg_input_unit": getattr(self.eeg_inlet, "input_unit", None),
             "eeg_output_unit": getattr(self.eeg_inlet, "output_unit", None),
             "artifact_valid": bool(is_valid),
+            "peak_to_peak_uv": peak_to_peak_uv,
             "image_id": parsed.image_id,
             "image_path": None if target is None else str(target.image_path),
         }

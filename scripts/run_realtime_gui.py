@@ -125,6 +125,42 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lab-split", choices=["all", "train", "val"], default="all", help="Lab split to replay.")
     parser.add_argument("--lab-subject", default=None, help="Optional lab subject folder to replay, e.g. P06 or zar.")
     parser.add_argument(
+        "--lab-bandpass-l-freq",
+        type=float,
+        default=None,
+        help="lab-live: highpass cutoff (Hz) for the epoch bandpass. Use 0.01 to match the offline filter.",
+    )
+    parser.add_argument(
+        "--lab-bandpass-h-freq",
+        type=float,
+        default=None,
+        help="lab-live: lowpass cutoff (Hz) for the epoch bandpass. Use 30 to match the offline filter.",
+    )
+    parser.add_argument(
+        "--lab-filter-order",
+        type=int,
+        default=4,
+        help="lab-live: Butterworth order for the epoch bandpass.",
+    )
+    parser.add_argument(
+        "--lab-ica-operator",
+        type=Path,
+        default=None,
+        help="lab-live: 31x31 calibrated ICA cleaning matrix (.npy) from lab_calibration.",
+    )
+    parser.add_argument(
+        "--lab-whitening-matrix",
+        type=Path,
+        default=None,
+        help="lab-live: precomputed 31x31 MVNN whitening matrix (.npy) applied to each live epoch.",
+    )
+    parser.add_argument(
+        "--lab-reject-uv",
+        type=float,
+        default=None,
+        help="lab-live: peak-to-peak artifact threshold (µV) flagged per epoch. Use 250 to match the offline reject.",
+    )
+    parser.add_argument(
         "--lab-whitening",
         choices=["none", "mvnn"],
         default="none",
@@ -484,10 +520,30 @@ def _run_main() -> int:
                         device=args.device,
                         model_num_channels=lab_model_channels,
                     )
+                from maryam_rt.integration.lab_calibration import load_operator
+
+                # The preprocessor drops Fz, so calibration operators are always 31x31
+                # regardless of the checkpoint's declared channel count.
+                lab_ica_operator = (
+                    load_operator(args.lab_ica_operator, expected_channels=31)
+                    if args.lab_ica_operator is not None
+                    else None
+                )
+                lab_whitening_matrix = (
+                    load_operator(args.lab_whitening_matrix, expected_channels=31)
+                    if args.lab_whitening_matrix is not None
+                    else None
+                )
                 epoch_preprocessor = StarstimLivePreprocessor(
                     input_sfreq=args.eeg_sampling_rate,
                     tmin=-args.pre_event_ms / 1000.0,
                     tmax=args.post_event_ms / 1000.0,
+                    l_freq=args.lab_bandpass_l_freq,
+                    h_freq=args.lab_bandpass_h_freq,
+                    filter_order=args.lab_filter_order,
+                    ica_operator=lab_ica_operator,
+                    whitening_matrix=lab_whitening_matrix,
+                    reject_peak_to_peak_uv=args.lab_reject_uv,
                 )
                 expected_epoch_samples = None
                 expected_channel_labels = tuple(STARSTIM_32_CHANNELS)

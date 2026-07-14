@@ -69,6 +69,57 @@ def parse_args() -> argparse.Namespace:
         help="Optional subject folder used to compute the whitener. Defaults to --subject.",
     )
     parser.add_argument(
+        "--lab-whitening-method",
+        choices=["custom", "shrinkage"],
+        default="custom",
+        help="MVNN estimator. 'custom' pools trials+time like the offline apply_mvnn; "
+        "'shrinkage' averages per-trial shrinkage covariances.",
+    )
+    parser.add_argument(
+        "--lab-whitening-matrix",
+        type=Path,
+        default=None,
+        help="Optional precomputed 31x31 whitening matrix (.npy). Overrides on-the-fly fitting and cache.",
+    )
+    parser.add_argument(
+        "--lab-whitening-first-block",
+        type=int,
+        default=None,
+        help="Use the first N trials (per subject, manifest order) as the calibration block "
+        "to fit the whitener; the remaining trials reuse the fitted matrix.",
+    )
+    parser.add_argument(
+        "--lab-bandpass-l-freq",
+        type=float,
+        default=None,
+        help="Highpass cutoff (Hz) for the epoch bandpass. Use 0.01 to match the offline filter.",
+    )
+    parser.add_argument(
+        "--lab-bandpass-h-freq",
+        type=float,
+        default=None,
+        help="Lowpass cutoff (Hz) for the epoch bandpass. Use 30 to match the offline filter.",
+    )
+    parser.add_argument(
+        "--lab-filter-order",
+        type=int,
+        default=4,
+        help="Butterworth order for the epoch bandpass.",
+    )
+    parser.add_argument(
+        "--lab-ica-operator",
+        type=Path,
+        default=None,
+        help="Optional 31x31 calibrated ICA cleaning matrix (.npy) from lab_calibration. "
+        "Applied to raw-source epochs only.",
+    )
+    parser.add_argument(
+        "--lab-reject-uv",
+        type=float,
+        default=None,
+        help="Peak-to-peak artifact threshold (µV) flagged per trial. Use 250 to match the offline reject.",
+    )
+    parser.add_argument(
         "--adapter",
         choices=["starstim31-to-things63", "none"],
         default="none",
@@ -273,6 +324,14 @@ def main() -> int:
                 lab_whitening_split=args.lab_whitening_split,
                 lab_whitening_cache=args.lab_whitening_cache,
                 lab_whitening_subject=args.lab_whitening_subject,
+                lab_whitening_method=args.lab_whitening_method,
+                lab_whitening_matrix=args.lab_whitening_matrix,
+                lab_whitening_first_block=args.lab_whitening_first_block,
+                lab_bandpass_l_freq=args.lab_bandpass_l_freq,
+                lab_bandpass_h_freq=args.lab_bandpass_h_freq,
+                lab_filter_order=args.lab_filter_order,
+                lab_ica_operator=args.lab_ica_operator,
+                lab_reject_peak_to_peak_uv=args.lab_reject_uv,
             ),
             encoder=encoder,
             decoder=decoder,
