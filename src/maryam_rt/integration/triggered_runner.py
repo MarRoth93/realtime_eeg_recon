@@ -332,6 +332,39 @@ class TriggeredReconstructionRunner:
     def _matches(payload: ParsedMarkerPayload, values: tuple[str, ...]) -> bool:
         return payload.event_name in values or payload.raw_value in values
 
+    def _log_incoming_marker(self, event: MarkerEvent, payload: ParsedMarkerPayload) -> None:
+        """Append every incoming marker to markers.jsonl for post-hoc diagnosis.
+
+        Records the raw value, the parsed/mapped value, whether it matched the
+        configured trigger set, and whether the trigger map recognized it. This
+        is the ground truth for "EEG streamed but no trials were received":
+        it shows exactly what the stimulus sent and why it was or wasn't accepted.
+        """
+        try:
+            raw = event.value
+            in_trigger_map = (
+                self.config.numeric_trigger_map is not None
+                and payload.raw_value in self.config.numeric_trigger_map
+            )
+            matches_trigger_values = (
+                payload.event_name in self.config.trigger_values
+                or payload.raw_value in self.config.trigger_values
+            )
+            record = {
+                "timestamp": float(event.timestamp),
+                "raw_marker": raw if isinstance(raw, str) else str(raw),
+                "parsed_raw_value": payload.raw_value,
+                "parsed_event_name": payload.event_name,
+                "in_trigger_map": bool(in_trigger_map),
+                "matches_trigger_values": bool(matches_trigger_values),
+            }
+            log_path = self.output_meta_dir.parent / "markers.jsonl"
+            with log_path.open("a") as handle:
+                handle.write(json.dumps(record) + "\n")
+        except Exception:
+            # Never let diagnostics break marker handling.
+            pass
+
     def _mapped_payload(self, event: MarkerEvent) -> ParsedMarkerPayload:
         payload = parse_marker_payload(event.value)
         trigger_map = self.config.numeric_trigger_map or {}
@@ -369,6 +402,7 @@ class TriggeredReconstructionRunner:
 
     def _handle_event(self, event: MarkerEvent) -> None:
         payload = self._mapped_payload(event)
+        self._log_incoming_marker(event, payload)
 
         marker_session_id = payload.metadata.get("session_id")
         if (
