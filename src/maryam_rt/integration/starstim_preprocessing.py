@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Callable, Sequence
 
 import numpy as np
 from scipy import signal
@@ -109,3 +109,28 @@ class StarstimLivePreprocessor:
         times = self.tmin + np.arange(x.shape[1], dtype=np.float32) / float(self.target_sfreq)
         x = baseline_correct(x, times, baseline=(self.tmin, 0.0))
         return crop_model_window(x, times, window=self.model_window, target_samples=self.model_samples)
+
+
+@dataclass(frozen=True)
+class SpatialWhiteningPreprocessor:
+    """Apply a fixed channel-space whitening matrix after base preprocessing."""
+
+    base_preprocessor: Callable[[np.ndarray], np.ndarray]
+    whitener: np.ndarray
+
+    def __post_init__(self) -> None:
+        matrix = np.asarray(self.whitener, dtype=np.float32)
+        if matrix.ndim != 2 or matrix.shape[0] != matrix.shape[1]:
+            raise ValueError(f"Spatial whitener must be a square matrix, got {matrix.shape}.")
+        if not np.isfinite(matrix).all():
+            raise ValueError("Spatial whitener contains non-finite values.")
+        object.__setattr__(self, "whitener", matrix)
+
+    def __call__(self, epoch: np.ndarray) -> np.ndarray:
+        processed = np.asarray(self.base_preprocessor(epoch), dtype=np.float32)
+        expected_channels = self.whitener.shape[1]
+        if processed.ndim != 2 or processed.shape[0] != expected_channels:
+            raise ValueError(
+                f"Spatial whitening expects {expected_channels} channels, got {processed.shape}."
+            )
+        return np.asarray(self.whitener @ processed, dtype=np.float32)

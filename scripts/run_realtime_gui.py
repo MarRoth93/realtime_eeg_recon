@@ -122,7 +122,7 @@ def parse_args() -> argparse.Namespace:
         "--lab-whitening",
         choices=["none", "mvnn"],
         default="none",
-        help="Optional lab replay whitening applied to the model input. Use mvnn for train-split MVNN.",
+        help="Optional lab-live/replay whitening applied to the model input. Use mvnn for train-split MVNN.",
     )
     parser.add_argument(
         "--lab-whitening-split",
@@ -134,7 +134,7 @@ def parse_args() -> argparse.Namespace:
         "--lab-whitening-cache",
         type=Path,
         default=None,
-        help="Optional .npy path for loading/saving the lab MVNN whitening matrix.",
+        help="Optional .npy path for loading/saving the lab MVNN matrix; required for lab-live MVNN.",
     )
     parser.add_argument(
         "--lab-whitening-subject",
@@ -263,10 +263,15 @@ def apply_mode_defaults(args: argparse.Namespace) -> None:
 def validate_lab_args(args: argparse.Namespace) -> None:
     if args.enable_lab_atms_embedding and args.mode != "lab-replay":
         raise SystemExit("--enable-lab-atms-embedding is currently wired for --mode lab-replay.")
-    if args.lab_whitening != "none" and args.mode != "lab-replay":
-        raise SystemExit("--lab-whitening is currently wired for --mode lab-replay.")
+    if args.lab_whitening != "none" and args.mode not in {"lab-live", "lab-replay"}:
+        raise SystemExit("--lab-whitening is supported only for --mode lab-live or lab-replay.")
     if args.lab_whitening != "none" and args.lab_adapter != "none":
         raise SystemExit("--lab-whitening mvnn is only supported with --lab-adapter none.")
+    if args.mode == "lab-live" and args.lab_whitening == "mvnn":
+        if args.lab_whitening_cache is None:
+            raise SystemExit("lab-live MVNN needs --lab-whitening-cache pointing to a fixed .npy matrix.")
+        if not args.lab_whitening_cache.expanduser().is_file():
+            raise SystemExit(f"Lab MVNN whitening cache does not exist: {args.lab_whitening_cache}")
     if args.mode not in {"lab-live", "lab-replay"} or args.lab_adapter == "starstim31-to-things63":
         return
     if args.mode == "lab-live" and args.lab_model_channels == 32:
@@ -457,7 +462,10 @@ def _run_main() -> int:
                     device=args.device,
                 )
             else:
-                from maryam_rt.integration.starstim_preprocessing import StarstimLivePreprocessor
+                from maryam_rt.integration.starstim_preprocessing import (
+                    SpatialWhiteningPreprocessor,
+                    StarstimLivePreprocessor,
+                )
                 from maryam_rt.integration.montage import STARSTIM_32_CHANNELS
 
                 lab_model_channels = args.lab_model_channels or 31
@@ -481,6 +489,11 @@ def _run_main() -> int:
                     tmin=-args.pre_event_ms / 1000.0,
                     tmax=args.post_event_ms / 1000.0,
                 )
+                if args.lab_whitening == "mvnn":
+                    import numpy as np
+
+                    whitener = np.load(args.lab_whitening_cache.expanduser())
+                    epoch_preprocessor = SpatialWhiteningPreprocessor(epoch_preprocessor, whitener)
                 expected_epoch_samples = None
                 expected_channel_labels = tuple(STARSTIM_32_CHANNELS)
             eeg_channels = 32
@@ -549,6 +562,16 @@ def _run_main() -> int:
                         if args.mode == "lab-live"
                         else str(checkpoints_dir / "low_level_encoder_sub01_60.pth"),
                         "low_level_arch": args.lab_low_level_arch if args.mode == "lab-live" else "legacy",
+                        "low_level_subject_id": str(args.lab_low_level_subject_id)
+                        if args.mode == "lab-live" and args.lab_low_level_subject_id is not None
+                        else "none",
+                        "low_level_latent_scaling": args.low_level_latent_scaling
+                        if args.mode == "lab-live"
+                        else "legacy",
+                        "lab_whitening": args.lab_whitening if args.mode == "lab-live" else "none",
+                        "lab_whitening_cache": str(args.lab_whitening_cache)
+                        if args.mode == "lab-live" and args.lab_whitening_cache is not None
+                        else "none",
                         "atms_checkpoint": str(args.lab_atms_checkpoint) if not args.disable_high_level else "disabled",
                         "prior_checkpoint": str(args.lab_prior_checkpoint) if not args.disable_high_level else "disabled",
                         "participant_conditioning": "shared_unseen"

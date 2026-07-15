@@ -22,6 +22,7 @@ from maryam_rt.integration.resample import (
 )
 from maryam_rt.integration.starstim31_atms import Starstim31ATMSEmbedder
 from maryam_rt.integration.starstim_preprocessing import (
+    SpatialWhiteningPreprocessor,
     StarstimLivePreprocessor,
     average_reference,
     baseline_correct,
@@ -104,6 +105,22 @@ def test_starstim_live_preprocessor_converts_500hz_starstim32_to_31x250() -> Non
     assert processed.shape == (31, 250)
     assert processed.dtype == np.float32
     np.testing.assert_allclose(processed.mean(axis=0, dtype=np.float64), 0.0, atol=1e-4)
+
+
+def test_spatial_whitening_runs_after_starstim_live_preprocessing() -> None:
+    samples = 600
+    raw = np.arange(32 * samples, dtype=np.float32).reshape(32, samples)
+    base = StarstimLivePreprocessor(input_sfreq=500.0, tmin=-0.2, tmax=1.0)
+    whitener = np.eye(31, dtype=np.float32) * 2.0
+
+    processed = SpatialWhiteningPreprocessor(base, whitener)(raw)
+
+    np.testing.assert_allclose(processed, base(raw) * 2.0, rtol=1e-6, atol=1e-6)
+
+
+def test_spatial_whitening_rejects_wrong_matrix_shape() -> None:
+    with pytest.raises(ValueError, match="square matrix"):
+        SpatialWhiteningPreprocessor(lambda epoch: epoch, np.zeros((31, 30), dtype=np.float32))
 
 
 def test_raw_lab_replay_uses_live_preprocessing_contract(tmp_path) -> None:
