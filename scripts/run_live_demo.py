@@ -9,6 +9,10 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = PROJECT_ROOT / "config" / "lab_demo.json"
+PARTICIPANT_MODES = {"known", "unseen"}
+LOW_LEVEL_ARCHITECTURES = {"plain", "transformed"}
+LOW_LEVEL_LATENT_SCALINGS = {"auto", "direct", "sdxl"}
+LAB_WHITENING_MODES = {"none", "mvnn"}
 
 
 def _project_path(value: str) -> Path:
@@ -54,12 +58,46 @@ def _append_lab_preprocessing(command: list[str], config: dict[str, object]) -> 
         command.extend(["--lab-whitening-matrix", str(whitening_matrix)])
 
 
+def _choice(config: dict[str, object], key: str, default: str, choices: set[str]) -> str:
+    value = str(config.get(key) or default).strip()
+    if value not in choices:
+        expected = ", ".join(sorted(choices))
+        raise SystemExit(f"Demo config {key!r} must be one of: {expected}.")
+    return value
+
+
+def _optional_int(config: dict[str, object], key: str) -> int | None:
+    value = config.get(key)
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise SystemExit(f"Demo config {key!r} must be an integer.") from exc
+
+
 def build_command(config_path: Path) -> list[str]:
     if not config_path.exists():
         raise SystemExit(f"Demo config not found: {config_path}")
     config = json.loads(config_path.read_text())
     if not isinstance(config, dict):
         raise SystemExit(f"Demo config must contain a JSON object: {config_path}")
+
+    participant_mode = _choice(config, "participant_mode", "unseen", PARTICIPANT_MODES)
+    subject_id = _optional_int(config, "subject_id")
+    low_level_arch = _choice(config, "low_level_arch", "plain", LOW_LEVEL_ARCHITECTURES)
+    low_level_subject_id = _optional_int(config, "low_level_subject_id")
+    latent_scaling = _choice(
+        config,
+        "low_level_latent_scaling",
+        "auto",
+        LOW_LEVEL_LATENT_SCALINGS,
+    )
+    lab_whitening = _choice(config, "lab_whitening", "none", LAB_WHITENING_MODES)
+    if participant_mode == "known" and subject_id is None:
+        raise SystemExit("Demo config needs 'subject_id' when participant_mode is 'known'.")
+    if low_level_arch == "transformed" and low_level_subject_id is None:
+        raise SystemExit("Demo config needs 'low_level_subject_id' for a transformed low-level checkpoint.")
 
     low_level = _required_path(config, "low_level_checkpoint")
     trigger_map = _required_path(config, "legacy_trigger_map")
@@ -72,7 +110,7 @@ def build_command(config_path: Path) -> list[str]:
         "--mode",
         "lab-live",
         "--participant-mode",
-        "unseen",
+        participant_mode,
         "--participant-code",
         str(config.get("participant_code") or "unseen-demo"),
         "--host",
@@ -92,11 +130,26 @@ def build_command(config_path: Path) -> list[str]:
         "--lab-model-channels",
         "31",
         "--lab-low-level-arch",
-        "plain",
+        low_level_arch,
+        "--low-level-latent-scaling",
+        latent_scaling,
         "--live-trigger-map",
         str(trigger_map),
         "--no-auto-connect",
     ]
+    if subject_id is not None:
+        command.extend(["--subject-id", str(subject_id)])
+    if low_level_subject_id is not None:
+        command.extend(["--lab-low-level-subject-id", str(low_level_subject_id)])
+    if lab_whitening == "mvnn":
+        command.extend(
+            [
+                "--lab-whitening",
+                "mvnn",
+                "--lab-whitening-cache",
+                str(_required_path(config, "lab_whitening_cache")),
+            ]
+        )
 
     image_root = str(config.get("image_root") or "").strip()
     if image_root:

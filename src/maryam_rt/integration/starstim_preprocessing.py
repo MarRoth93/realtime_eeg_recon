@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Sequence
+from typing import Callable, Optional, Sequence
 
 import numpy as np
 from scipy import signal
@@ -231,3 +231,28 @@ class StarstimLivePreprocessor:
             x = apply_linear_operator(x, self.whitening_matrix)
 
         return PreprocessResult(epoch=x, peak_to_peak_uv=ptp, rejected=rejected)
+
+
+@dataclass(frozen=True)
+class SpatialWhiteningPreprocessor:
+    """Apply a fixed channel-space whitening matrix after base preprocessing."""
+
+    base_preprocessor: Callable[[np.ndarray], np.ndarray]
+    whitener: np.ndarray
+
+    def __post_init__(self) -> None:
+        matrix = np.asarray(self.whitener, dtype=np.float32)
+        if matrix.ndim != 2 or matrix.shape[0] != matrix.shape[1]:
+            raise ValueError(f"Spatial whitener must be a square matrix, got {matrix.shape}.")
+        if not np.isfinite(matrix).all():
+            raise ValueError("Spatial whitener contains non-finite values.")
+        object.__setattr__(self, "whitener", matrix)
+
+    def __call__(self, epoch: np.ndarray) -> np.ndarray:
+        processed = np.asarray(self.base_preprocessor(epoch), dtype=np.float32)
+        expected_channels = self.whitener.shape[1]
+        if processed.ndim != 2 or processed.shape[0] != expected_channels:
+            raise ValueError(
+                f"Spatial whitening expects {expected_channels} channels, got {processed.shape}."
+            )
+        return np.asarray(self.whitener @ processed, dtype=np.float32)
