@@ -1656,6 +1656,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+calibration = [
+    { name = "mne-icalabel" },
+]
 dev = [
     { name = "pytest" },
 ]
@@ -1691,6 +1694,7 @@ requires-dist = [
     { name = "matplotlib" },
     { name = "mne" },
     { name = "mne-bids", marker = "extra == 'full'" },
+    { name = "mne-icalabel", marker = "extra == 'calibration'" },
     { name = "numpy", specifier = "==1.26.4" },
     { name = "onnx", marker = "extra == 'full'" },
     { name = "onnxruntime", marker = "extra == 'full'", specifier = "<1.24" },
@@ -1717,7 +1721,7 @@ requires-dist = [
     { name = "uvicorn", specifier = ">=0.30.0" },
     { name = "wfdb", marker = "extra == 'lab'", specifier = "==4.3.1" },
 ]
-provides-extras = ["dev", "full", "lab"]
+provides-extras = ["dev", "full", "calibration", "lab"]
 
 [[package]]
 name = "matplotlib"
@@ -1966,6 +1970,24 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/e9/42/6ddd792c209070c67125a6fd2fb82024cfb4e9eeda507cd59f3cfb4e6a44/mne_bids-0.19.0.tar.gz", hash = "sha256:4166c3ad5afa81f4943d675cdc7e0b90efea6fb470373e667eb93579e18f2409", size = 151834, upload-time = "2026-05-26T18:15:41.493Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3f/1d/e2c940f8bd8ef0cb2d32d039bd2537ff96d31c17acb643b6f1480a73da8a/mne_bids-0.19.0-py3-none-any.whl", hash = "sha256:2ee6631115fef654e1d0f6c0fb52b99a4f808418c51b36c000ac46933b6e31d3", size = 189809, upload-time = "2026-05-26T18:15:39.835Z" },
+]
+
+[[package]]
+name = "mne-icalabel"
+version = "0.9.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "mne" },
+    { name = "numpy" },
+    { name = "packaging" },
+    { name = "pooch" },
+    { name = "psutil" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/69/6d/ce0746fb6cac72e54f2c700a34ecd124e377c1478f9f06c1a6417bd9a763/mne_icalabel-0.9.0.tar.gz", hash = "sha256:85c674ef96f39fa6e9bfd8d359fc7e84f05d5fa43e3ade332ef95a7209386614", size = 48811402, upload-time = "2026-05-20T12:43:36.832Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/47/a5/71a3ec88d87da7ec40c48ed8c85677b9f07f2cef4076e479cc024d954339/mne_icalabel-0.9.0-py3-none-any.whl", hash = "sha256:6abb5faa95ad7a5f6e9f9fa80ab7c27eb92101e8bb25f2bd703712aaf7cba689", size = 48833981, upload-time = "2026-05-20T12:43:33.122Z" },
 ]
 
 [[package]]

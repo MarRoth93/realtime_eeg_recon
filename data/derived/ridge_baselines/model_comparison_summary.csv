@@ -1,0 +1,6 @@
+family,name,selection,n_eval,split_top1,split_top5,all160_top1,all160_top5,notes
+zero_shot_atms,pretrained_starstim31,none,256,0.04296875,0.15234375,0.0078125,0.04296875,no lab fine-tuning
+atms_broad,LAB_D_encoder_projection_COS010,best split top5,256,0.046875,0.21484375,0.0,0.0,"scope=encoder_projection, lr=3e-05, cos=0.1, trip=0.0"
+atms_focused,FOCUS_REP_spatial_projection_LR2e-5_COS010_TRIP005_MILD_S66,best composite,256,0.046875,0.1875,0.0078125,0.046875,"scope=spatial_projection, lr=2e-05, cos=0.1, trip=0.05"
+ridge_baseline,baseline_allch_80_700ms_6bins__train-single_trial__eval-image,best split top5 alpha=0.1,32,0.09375,0.3125,0.0,0.0,"train=single_trial, eval=image, x_dim=186"
+ridge_baseline,baseline_allch_80_700ms_6bins__train-single_trial__eval-image,best all160 top5 alpha=100.0,32,0.0625,0.25,0.0,0.03125,"train=single_trial, eval=image, x_dim=186"

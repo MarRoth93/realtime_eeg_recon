@@ -1,0 +1,961 @@
+subject_folder	trigger	category	n_total	n_usable	repeat_corr_flat_31x250	status
+P04	1001	limousine	2	1		insufficient_after_rejection
+P04	1002	pea	1	1		insufficient_after_rejection
+P04	1003	shorts	1	1		insufficient_after_rejection
+P04	1004	dalmatian	1	1		insufficient_after_rejection
+P04	1005	ottoman	1	1		insufficient_after_rejection
+P04	1006	cardinal	2	2	0.605696	pass
+P04	1007	mirror	1	1		insufficient_after_rejection
+P04	1008	keyboard	1	1		insufficient_after_rejection
+P04	1009	papaya	1	1		insufficient_after_rejection
+P04	1010	pineapple	1	1		insufficient_after_rejection
+P04	1011	raspberry	1	1		insufficient_after_rejection
+P04	1012	burrito	2	2	-0.360017	pass
+P04	1013	banana	1	1		insufficient_after_rejection
+P04	1014	shark	1	1		insufficient_after_rejection
+P04	1015	moose	2	2	0.570631	pass
+P04	1016	ant	1	1		insufficient_after_rejection
+P04	1017	carrot	1	1		insufficient_after_rejection
+P04	1018	coffee	1	1		insufficient_after_rejection
+P04	1019	videocassette	1	1		insufficient_after_rejection
+P04	1020	television	2	2	-0.201102	pass
+P04	1021	tea	1	1		insufficient_after_rejection
+P04	1022	shoe	1	1		insufficient_after_rejection
+P04	1023	wolf	2	2	0.266152	pass
+P04	1024	lab_coat	1	1		insufficient_after_rejection
+P04	1025	llama	1	1		insufficient_after_rejection
+P04	1026	asparagus	1	1		insufficient_after_rejection
+P04	1027	memory_stick	2	2	0.609312	pass
+P04	1028	meatball	1	1		insufficient_after_rejection
+P04	1029	sheep	1	1		insufficient_after_rejection
+P04	1030	puffin	1	1		insufficient_after_rejection
+P04	1031	fish	1	1		insufficient_after_rejection
+P04	1032	pants	1	1		insufficient_after_rejection
+P04	1033	helmet	1	1		insufficient_after_rejection
+P04	1034	bracelet1	1	1		insufficient_after_rejection
+P04	1035	lizard	1	1		insufficient_after_rejection
+P04	1036	ladybug	1	1		insufficient_after_rejection
+P04	1037	steamroller	1	1		insufficient_after_rejection
+P04	1038	cupcake	1	1		insufficient_after_rejection
+P04	1039	sailboat	1	1		insufficient_after_rejection
+P04	1040	panda	1	1		insufficient_after_rejection
+P04	1041	octopus	1	1		insufficient_after_rejection
+P04	1042	eagle	1	1		insufficient_after_rejection
+P04	1043	ostrich	1	1		insufficient_after_rejection
+P04	1044	raccoon	1	1		insufficient_after_rejection
+P04	1045	goose	2	2	0.716082	pass
+P04	1046	tiramisu	2	2	0.646044	pass
+P04	1047	drawer	1	1		insufficient_after_rejection
+P04	1048	sombrero	1	1		insufficient_after_rejection
+P04	1049	rat	1	1		insufficient_after_rejection
+P04	1050	artichoke	1	1		insufficient_after_rejection
+P04	1051	yacht	2	2	-0.234775	pass
+P04	1052	wallpaper	2	2	0.085663	pass
+P04	1053	reindeer	2	2	0.447150	pass
+P04	1054	bathtub	1	1		insufficient_after_rejection
+P04	1055	seagull	1	1		insufficient_after_rejection
+P04	1056	leggings	1	1		insufficient_after_rejection
+P04	1057	eggnog	1	1		insufficient_after_rejection
+P04	1058	loveseat	1	1		insufficient_after_rejection
+P04	1059	zucchini	2	2	0.682282	pass
+P04	1060	squirrel	2	2	-0.136927	pass
+P04	1061	taco	2	2	0.804483	pass
+P04	1062	antelope	2	2	0.722581	pass
+P04	1063	car	1	1		insufficient_after_rejection
+P04	1064	fly	1	1		insufficient_after_rejection
+P04	1065	cabinet	1	1		insufficient_after_rejection
+P04	1066	giraffe	1	1		insufficient_after_rejection
+P04	1067	taffy	1	1		insufficient_after_rejection
+P04	1068	radio	1	1		insufficient_after_rejection
+P04	1069	rollerblade	1	1		insufficient_after_rejection
+P04	1070	dragonfly	1	1		insufficient_after_rejection
+P04	1071	mongoose	2	2	-0.243324	pass
+P04	1072	blackberry	1	1		insufficient_after_rejection
+P04	1073	bull	1	1		insufficient_after_rejection
+P04	1074	cobra	1	1		insufficient_after_rejection
+P04	1075	filing_cabinet	1	1		insufficient_after_rejection
+P04	1076	groundhog	1	1		insufficient_after_rejection
+P04	1077	bison	1	1		insufficient_after_rejection
+P04	1078	sea_urchin	1	1		insufficient_after_rejection
+P04	1079	puppy	1	1		insufficient_after_rejection
+P04	1080	camcorder	1	1		insufficient_after_rejection
+P04	1081	police_car	1	1		insufficient_after_rejection
+P04	1082	necklace	2	2	0.815460	pass
+P04	1083	shirt	1	1		insufficient_after_rejection
+P04	1084	cheetah	2	2	0.415150	pass
+P04	1085	frog	1	1		insufficient_after_rejection
+P04	1086	pasta	1	1		insufficient_after_rejection
+P04	1087	bathrobe	1	1		insufficient_after_rejection
+P04	1088	slipper	1	1		insufficient_after_rejection
+P04	1089	unicycle	1	1		insufficient_after_rejection
+P04	1090	garlic	1	1		insufficient_after_rejection
+P04	1091	kitten	1	1		insufficient_after_rejection
+P04	1092	bunkbed	2	2	0.343077	pass
+P04	1093	duckling	1	1		insufficient_after_rejection
+P04	1094	onion	1	1		insufficient_after_rejection
+P04	1095	mouse2	1	1		insufficient_after_rejection
+P04	1096	beaver	1	1		insufficient_after_rejection
+P04	1097	sandwich	1	1		insufficient_after_rejection
+P04	1098	stool	1	0		insufficient_after_rejection
+P04	1099	tricycle	1	1		insufficient_after_rejection
+P04	1100	champagne	1	1		insufficient_after_rejection
+P04	1101	boat	1	1		insufficient_after_rejection
+P04	1102	crab	1	1		insufficient_after_rejection
+P04	1103	blazer	1	1		insufficient_after_rejection
+P04	1104	speaker	2	1		insufficient_after_rejection
+P04	1105	gorilla	1	1		insufficient_after_rejection
+P04	1106	swordfish	1	1		insufficient_after_rejection
+P04	1107	omelet	1	1		insufficient_after_rejection
+P04	1108	possum	1	1		insufficient_after_rejection
+P04	1109	wasp	1	1		insufficient_after_rejection
+P04	1110	jet	2	2	0.059764	pass
+P04	1111	creme_brulee	1	1		insufficient_after_rejection
+P04	1112	hard_disk	1	1		insufficient_after_rejection
+P04	1113	firetruck	1	1		insufficient_after_rejection
+P04	1114	spinach	1	1		insufficient_after_rejection
+P04	1115	marshmallow	1	1		insufficient_after_rejection
+P04	1116	praying_mantis	1	1		insufficient_after_rejection
+P04	1117	hamster	1	1		insufficient_after_rejection
+P04	1118	candy_bar	2	2	0.918461	pass
+P04	1119	star_fruit	1	1		insufficient_after_rejection
+P04	1120	owl	2	2	0.915116	pass
+P04	1121	sunglasses	2	2	0.061445	pass
+P04	1122	webcam	1	0		insufficient_after_rejection
+P04	1123	sorbet	1	1		insufficient_after_rejection
+P04	1124	nightshirt	2	2	-0.001219	pass
+P04	1125	sundae	2	2	-0.150919	pass
+P04	1126	helicopter	2	2	0.783071	pass
+P04	1127	space_shuttle	1	1		insufficient_after_rejection
+P04	1128	toad	1	1		insufficient_after_rejection
+P04	1129	workbench	2	2	0.424617	pass
+P04	1130	showerhead	2	2	0.867777	pass
+P04	1131	eel	1	1		insufficient_after_rejection
+P04	1132	polar_bear	2	2	0.270448	pass
+P04	1133	cockatoo	1	1		insufficient_after_rejection
+P04	1134	sleeping_bag	2	2	0.720782	pass
+P04	1135	pony	1	1		insufficient_after_rejection
+P04	1136	snake	1	1		insufficient_after_rejection
+P04	1137	lamb	1	1		insufficient_after_rejection
+P04	1138	ping-pong_table	1	1		insufficient_after_rejection
+P04	1139	earwig	1	1		insufficient_after_rejection
+P04	1140	kayak	1	1		insufficient_after_rejection
+P04	1141	peach	1	1		insufficient_after_rejection
+P04	1142	piglet	1	1		insufficient_after_rejection
+P04	1143	mango	2	1		insufficient_after_rejection
+P04	1144	tarantula	2	1		insufficient_after_rejection
+P04	1145	rocking_chair	2	2	-0.145605	pass
+P04	1146	cheesecake	1	1		insufficient_after_rejection
+P04	1147	lemonade	2	2	0.693541	pass
+P04	1148	broccoli	1	1		insufficient_after_rejection
+P04	1149	mole	1	1		insufficient_after_rejection
+P04	1150	chick	2	2	0.487086	pass
+P04	1151	tractor	1	1		insufficient_after_rejection
+P04	1152	speedboat	1	0		insufficient_after_rejection
+P04	1153	donut	1	1		insufficient_after_rejection
+P04	1154	chandelier	1	1		insufficient_after_rejection
+P04	1155	kale	1	1		insufficient_after_rejection
+P04	1156	coconut	1	1		insufficient_after_rejection
+P04	1157	barnacle	2	2	-0.208194	pass
+P04	1158	bulldozer	1	1		insufficient_after_rejection
+P04	1159	pear	2	1		insufficient_after_rejection
+P04	1160	clam	2	1		insufficient_after_rejection
+P05	1001	limousine	2	2	0.569454	pass
+P05	1002	pea	1	1		insufficient_after_rejection
+P05	1003	shorts	1	1		insufficient_after_rejection
+P05	1004	dalmatian	1	1		insufficient_after_rejection
+P05	1005	ottoman	1	1		insufficient_after_rejection
+P05	1006	cardinal	2	2	0.267103	pass
+P05	1007	mirror	1	1		insufficient_after_rejection
+P05	1008	keyboard	1	1		insufficient_after_rejection
+P05	1009	papaya	1	1		insufficient_after_rejection
+P05	1010	pineapple	1	1		insufficient_after_rejection
+P05	1011	raspberry	1	1		insufficient_after_rejection
+P05	1012	burrito	2	2	0.320250	pass
+P05	1013	banana	1	1		insufficient_after_rejection
+P05	1014	shark	1	1		insufficient_after_rejection
+P05	1015	moose	2	2	0.354932	pass
+P05	1016	ant	1	1		insufficient_after_rejection
+P05	1017	carrot	1	1		insufficient_after_rejection
+P05	1018	coffee	1	1		insufficient_after_rejection
+P05	1019	videocassette	1	1		insufficient_after_rejection
+P05	1020	television	2	2	0.251851	pass
+P05	1021	tea	1	1		insufficient_after_rejection
+P05	1022	shoe	1	1		insufficient_after_rejection
+P05	1023	wolf	2	2	-0.045309	pass
+P05	1024	lab_coat	1	1		insufficient_after_rejection
+P05	1025	llama	1	1		insufficient_after_rejection
+P05	1026	asparagus	1	1		insufficient_after_rejection
+P05	1027	memory_stick	2	2	0.319312	pass
+P05	1028	meatball	1	1		insufficient_after_rejection
+P05	1029	sheep	1	1		insufficient_after_rejection
+P05	1030	puffin	1	1		insufficient_after_rejection
+P05	1031	fish	1	1		insufficient_after_rejection
+P05	1032	pants	1	1		insufficient_after_rejection
+P05	1033	helmet	1	1		insufficient_after_rejection
+P05	1034	bracelet1	1	1		insufficient_after_rejection
+P05	1035	lizard	1	1		insufficient_after_rejection
+P05	1036	ladybug	1	1		insufficient_after_rejection
+P05	1037	steamroller	1	1		insufficient_after_rejection
+P05	1038	cupcake	1	1		insufficient_after_rejection
+P05	1039	sailboat	1	1		insufficient_after_rejection
+P05	1040	panda	1	1		insufficient_after_rejection
+P05	1041	octopus	1	1		insufficient_after_rejection
+P05	1042	eagle	1	1		insufficient_after_rejection
+P05	1043	ostrich	1	1		insufficient_after_rejection
+P05	1044	raccoon	1	1		insufficient_after_rejection
+P05	1045	goose	2	2	0.360790	pass
+P05	1046	tiramisu	2	2	0.629383	pass
+P05	1047	drawer	1	1		insufficient_after_rejection
+P05	1048	sombrero	1	1		insufficient_after_rejection
+P05	1049	rat	1	1		insufficient_after_rejection
+P05	1050	artichoke	1	1		insufficient_after_rejection
+P05	1051	yacht	2	2	0.269877	pass
+P05	1052	wallpaper	2	2	0.256541	pass
+P05	1053	reindeer	2	2	-0.269286	pass
+P05	1054	bathtub	1	1		insufficient_after_rejection
+P05	1055	seagull	1	1		insufficient_after_rejection
+P05	1056	leggings	1	1		insufficient_after_rejection
+P05	1057	eggnog	1	1		insufficient_after_rejection
+P05	1058	loveseat	1	1		insufficient_after_rejection
+P05	1059	zucchini	2	2	0.421830	pass
+P05	1060	squirrel	2	2	0.207721	pass
+P05	1061	taco	2	2	-0.011567	pass
+P05	1062	antelope	2	2	0.684856	pass
+P05	1063	car	1	1		insufficient_after_rejection
+P05	1064	fly	1	1		insufficient_after_rejection
+P05	1065	cabinet	1	1		insufficient_after_rejection
+P05	1066	giraffe	1	1		insufficient_after_rejection
+P05	1067	taffy	1	1		insufficient_after_rejection
+P05	1068	radio	1	1		insufficient_after_rejection
+P05	1069	rollerblade	1	1		insufficient_after_rejection
+P05	1070	dragonfly	1	1		insufficient_after_rejection
+P05	1071	mongoose	2	2	0.242080	pass
+P05	1072	blackberry	1	1		insufficient_after_rejection
+P05	1073	bull	1	1		insufficient_after_rejection
+P05	1074	cobra	1	1		insufficient_after_rejection
+P05	1075	filing_cabinet	1	1		insufficient_after_rejection
+P05	1076	groundhog	1	1		insufficient_after_rejection
+P05	1077	bison	1	1		insufficient_after_rejection
+P05	1078	sea_urchin	1	1		insufficient_after_rejection
+P05	1079	puppy	1	1		insufficient_after_rejection
+P05	1080	camcorder	1	1		insufficient_after_rejection
+P05	1081	police_car	1	1		insufficient_after_rejection
+P05	1082	necklace	2	2	-0.114992	pass
+P05	1083	shirt	1	1		insufficient_after_rejection
+P05	1084	cheetah	2	2	0.329884	pass
+P05	1085	frog	1	1		insufficient_after_rejection
+P05	1086	pasta	1	1		insufficient_after_rejection
+P05	1087	bathrobe	1	1		insufficient_after_rejection
+P05	1088	slipper	1	1		insufficient_after_rejection
+P05	1089	unicycle	1	1		insufficient_after_rejection
+P05	1090	garlic	1	1		insufficient_after_rejection
+P05	1091	kitten	1	1		insufficient_after_rejection
+P05	1092	bunkbed	2	2	0.384148	pass
+P05	1093	duckling	1	1		insufficient_after_rejection
+P05	1094	onion	1	1		insufficient_after_rejection
+P05	1095	mouse2	1	1		insufficient_after_rejection
+P05	1096	beaver	1	1		insufficient_after_rejection
+P05	1097	sandwich	1	1		insufficient_after_rejection
+P05	1098	stool	1	1		insufficient_after_rejection
+P05	1099	tricycle	1	1		insufficient_after_rejection
+P05	1100	champagne	1	1		insufficient_after_rejection
+P05	1101	boat	1	1		insufficient_after_rejection
+P05	1102	crab	1	1		insufficient_after_rejection
+P05	1103	blazer	1	1		insufficient_after_rejection
+P05	1104	speaker	2	2	0.048625	pass
+P05	1105	gorilla	1	1		insufficient_after_rejection
+P05	1106	swordfish	1	1		insufficient_after_rejection
+P05	1107	omelet	1	1		insufficient_after_rejection
+P05	1108	possum	1	1		insufficient_after_rejection
+P05	1109	wasp	1	1		insufficient_after_rejection
+P05	1110	jet	2	2	-0.041439	pass
+P05	1111	creme_brulee	1	1		insufficient_after_rejection
+P05	1112	hard_disk	1	1		insufficient_after_rejection
+P05	1113	firetruck	1	1		insufficient_after_rejection
+P05	1114	spinach	1	1		insufficient_after_rejection
+P05	1115	marshmallow	1	1		insufficient_after_rejection
+P05	1116	praying_mantis	1	1		insufficient_after_rejection
+P05	1117	hamster	1	1		insufficient_after_rejection
+P05	1118	candy_bar	2	2	0.666434	pass
+P05	1119	star_fruit	1	1		insufficient_after_rejection
+P05	1120	owl	2	2	0.201839	pass
+P05	1121	sunglasses	2	2	0.209433	pass
+P05	1122	webcam	1	1		insufficient_after_rejection
+P05	1123	sorbet	1	1		insufficient_after_rejection
+P05	1124	nightshirt	2	2	0.245350	pass
+P05	1125	sundae	2	2	0.285210	pass
+P05	1126	helicopter	2	2	0.470813	pass
+P05	1127	space_shuttle	1	1		insufficient_after_rejection
+P05	1128	toad	1	1		insufficient_after_rejection
+P05	1129	workbench	2	2	0.269305	pass
+P05	1130	showerhead	2	2	0.333964	pass
+P05	1131	eel	1	1		insufficient_after_rejection
+P05	1132	polar_bear	2	2	0.071348	pass
+P05	1133	cockatoo	1	1		insufficient_after_rejection
+P05	1134	sleeping_bag	2	2	0.155912	pass
+P05	1135	pony	1	1		insufficient_after_rejection
+P05	1136	snake	1	1		insufficient_after_rejection
+P05	1137	lamb	1	1		insufficient_after_rejection
+P05	1138	ping-pong_table	1	1		insufficient_after_rejection
+P05	1139	earwig	1	1		insufficient_after_rejection
+P05	1140	kayak	1	1		insufficient_after_rejection
+P05	1141	peach	1	1		insufficient_after_rejection
+P05	1142	piglet	1	1		insufficient_after_rejection
+P05	1143	mango	2	2	-0.106849	pass
+P05	1144	tarantula	2	2	0.526961	pass
+P05	1145	rocking_chair	2	2	0.020487	pass
+P05	1146	cheesecake	1	1		insufficient_after_rejection
+P05	1147	lemonade	2	2	0.459053	pass
+P05	1148	broccoli	1	1		insufficient_after_rejection
+P05	1149	mole	1	1		insufficient_after_rejection
+P05	1150	chick	2	2	0.383389	pass
+P05	1151	tractor	1	1		insufficient_after_rejection
+P05	1152	speedboat	1	1		insufficient_after_rejection
+P05	1153	donut	1	1		insufficient_after_rejection
+P05	1154	chandelier	1	1		insufficient_after_rejection
+P05	1155	kale	1	1		insufficient_after_rejection
+P05	1156	coconut	1	1		insufficient_after_rejection
+P05	1157	barnacle	2	2	0.071482	pass
+P05	1158	bulldozer	1	1		insufficient_after_rejection
+P05	1159	pear	2	2	0.660391	pass
+P05	1160	clam	2	2	0.679803	pass
+P06	1001	limousine	2	2	0.456335	pass
+P06	1002	pea	1	1		insufficient_after_rejection
+P06	1003	shorts	1	1		insufficient_after_rejection
+P06	1004	dalmatian	1	1		insufficient_after_rejection
+P06	1005	ottoman	1	1		insufficient_after_rejection
+P06	1006	cardinal	2	2	0.176666	pass
+P06	1007	mirror	1	1		insufficient_after_rejection
+P06	1008	keyboard	1	1		insufficient_after_rejection
+P06	1009	papaya	1	1		insufficient_after_rejection
+P06	1010	pineapple	1	1		insufficient_after_rejection
+P06	1011	raspberry	1	1		insufficient_after_rejection
+P06	1012	burrito	2	2	0.352036	pass
+P06	1013	banana	1	1		insufficient_after_rejection
+P06	1014	shark	1	1		insufficient_after_rejection
+P06	1015	moose	2	2	0.414605	pass
+P06	1016	ant	1	1		insufficient_after_rejection
+P06	1017	carrot	1	1		insufficient_after_rejection
+P06	1018	coffee	1	1		insufficient_after_rejection
+P06	1019	videocassette	1	1		insufficient_after_rejection
+P06	1020	television	2	2	0.025094	pass
+P06	1021	tea	1	1		insufficient_after_rejection
+P06	1022	shoe	1	1		insufficient_after_rejection
+P06	1023	wolf	2	2	0.570576	pass
+P06	1024	lab_coat	1	1		insufficient_after_rejection
+P06	1025	llama	1	1		insufficient_after_rejection
+P06	1026	asparagus	1	1		insufficient_after_rejection
+P06	1027	memory_stick	2	2	0.270524	pass
+P06	1028	meatball	1	1		insufficient_after_rejection
+P06	1029	sheep	1	1		insufficient_after_rejection
+P06	1030	puffin	1	1		insufficient_after_rejection
+P06	1031	fish	1	1		insufficient_after_rejection
+P06	1032	pants	1	1		insufficient_after_rejection
+P06	1033	helmet	1	1		insufficient_after_rejection
+P06	1034	bracelet1	1	1		insufficient_after_rejection
+P06	1035	lizard	1	1		insufficient_after_rejection
+P06	1036	ladybug	1	1		insufficient_after_rejection
+P06	1037	steamroller	1	1		insufficient_after_rejection
+P06	1038	cupcake	1	1		insufficient_after_rejection
+P06	1039	sailboat	1	1		insufficient_after_rejection
+P06	1040	panda	1	1		insufficient_after_rejection
+P06	1041	octopus	1	1		insufficient_after_rejection
+P06	1042	eagle	1	1		insufficient_after_rejection
+P06	1043	ostrich	1	1		insufficient_after_rejection
+P06	1044	raccoon	1	1		insufficient_after_rejection
+P06	1045	goose	2	2	0.447497	pass
+P06	1046	tiramisu	2	2	0.241917	pass
+P06	1047	drawer	1	1		insufficient_after_rejection
+P06	1048	sombrero	1	1		insufficient_after_rejection
+P06	1049	rat	1	1		insufficient_after_rejection
+P06	1050	artichoke	1	1		insufficient_after_rejection
+P06	1051	yacht	2	2	0.184144	pass
+P06	1052	wallpaper	2	2	0.287603	pass
+P06	1053	reindeer	2	2	0.249568	pass
+P06	1054	bathtub	1	1		insufficient_after_rejection
+P06	1055	seagull	1	1		insufficient_after_rejection
+P06	1056	leggings	1	1		insufficient_after_rejection
+P06	1057	eggnog	1	1		insufficient_after_rejection
+P06	1058	loveseat	1	1		insufficient_after_rejection
+P06	1059	zucchini	2	2	0.482335	pass
+P06	1060	squirrel	2	2	-0.203689	pass
+P06	1061	taco	2	2	0.276159	pass
+P06	1062	antelope	2	2	0.030564	pass
+P06	1063	car	1	1		insufficient_after_rejection
+P06	1064	fly	1	1		insufficient_after_rejection
+P06	1065	cabinet	1	1		insufficient_after_rejection
+P06	1066	giraffe	1	1		insufficient_after_rejection
+P06	1067	taffy	1	1		insufficient_after_rejection
+P06	1068	radio	1	1		insufficient_after_rejection
+P06	1069	rollerblade	1	1		insufficient_after_rejection
+P06	1070	dragonfly	1	1		insufficient_after_rejection
+P06	1071	mongoose	2	2	0.386071	pass
+P06	1072	blackberry	1	1		insufficient_after_rejection
+P06	1073	bull	1	1		insufficient_after_rejection
+P06	1074	cobra	1	1		insufficient_after_rejection
+P06	1075	filing_cabinet	1	1		insufficient_after_rejection
+P06	1076	groundhog	1	1		insufficient_after_rejection
+P06	1077	bison	1	1		insufficient_after_rejection
+P06	1078	sea_urchin	1	1		insufficient_after_rejection
+P06	1079	puppy	1	1		insufficient_after_rejection
+P06	1080	camcorder	1	1		insufficient_after_rejection
+P06	1081	police_car	1	1		insufficient_after_rejection
+P06	1082	necklace	2	2	-0.686905	pass
+P06	1083	shirt	1	1		insufficient_after_rejection
+P06	1084	cheetah	2	2	-0.436483	pass
+P06	1085	frog	1	1		insufficient_after_rejection
+P06	1086	pasta	1	1		insufficient_after_rejection
+P06	1087	bathrobe	1	1		insufficient_after_rejection
+P06	1088	slipper	1	1		insufficient_after_rejection
+P06	1089	unicycle	1	1		insufficient_after_rejection
+P06	1090	garlic	1	1		insufficient_after_rejection
+P06	1091	kitten	1	1		insufficient_after_rejection
+P06	1092	bunkbed	2	2	0.375433	pass
+P06	1093	duckling	1	1		insufficient_after_rejection
+P06	1094	onion	1	1		insufficient_after_rejection
+P06	1095	mouse2	1	1		insufficient_after_rejection
+P06	1096	beaver	1	1		insufficient_after_rejection
+P06	1097	sandwich	1	1		insufficient_after_rejection
+P06	1098	stool	1	1		insufficient_after_rejection
+P06	1099	tricycle	1	1		insufficient_after_rejection
+P06	1100	champagne	1	1		insufficient_after_rejection
+P06	1101	boat	1	1		insufficient_after_rejection
+P06	1102	crab	1	1		insufficient_after_rejection
+P06	1103	blazer	1	1		insufficient_after_rejection
+P06	1104	speaker	2	2	0.289575	pass
+P06	1105	gorilla	1	1		insufficient_after_rejection
+P06	1106	swordfish	1	1		insufficient_after_rejection
+P06	1107	omelet	1	1		insufficient_after_rejection
+P06	1108	possum	1	1		insufficient_after_rejection
+P06	1109	wasp	1	1		insufficient_after_rejection
+P06	1110	jet	2	2	-0.571374	pass
+P06	1111	creme_brulee	1	1		insufficient_after_rejection
+P06	1112	hard_disk	1	1		insufficient_after_rejection
+P06	1113	firetruck	1	1		insufficient_after_rejection
+P06	1114	spinach	1	1		insufficient_after_rejection
+P06	1115	marshmallow	1	1		insufficient_after_rejection
+P06	1116	praying_mantis	1	1		insufficient_after_rejection
+P06	1117	hamster	1	1		insufficient_after_rejection
+P06	1118	candy_bar	2	2	0.379252	pass
+P06	1119	star_fruit	1	1		insufficient_after_rejection
+P06	1120	owl	2	2	0.082821	pass
+P06	1121	sunglasses	2	2	0.548327	pass
+P06	1122	webcam	1	1		insufficient_after_rejection
+P06	1123	sorbet	1	1		insufficient_after_rejection
+P06	1124	nightshirt	2	2	0.058621	pass
+P06	1125	sundae	2	2	0.786445	pass
+P06	1126	helicopter	2	2	0.393648	pass
+P06	1127	space_shuttle	1	1		insufficient_after_rejection
+P06	1128	toad	1	1		insufficient_after_rejection
+P06	1129	workbench	2	2	0.263669	pass
+P06	1130	showerhead	2	2	0.064406	pass
+P06	1131	eel	1	1		insufficient_after_rejection
+P06	1132	polar_bear	2	2	-0.028076	pass
+P06	1133	cockatoo	1	1		insufficient_after_rejection
+P06	1134	sleeping_bag	2	2	0.345809	pass
+P06	1135	pony	1	1		insufficient_after_rejection
+P06	1136	snake	1	1		insufficient_after_rejection
+P06	1137	lamb	1	1		insufficient_after_rejection
+P06	1138	ping-pong_table	1	1		insufficient_after_rejection
+P06	1139	earwig	1	1		insufficient_after_rejection
+P06	1140	kayak	1	1		insufficient_after_rejection
+P06	1141	peach	1	1		insufficient_after_rejection
+P06	1142	piglet	1	1		insufficient_after_rejection
+P06	1143	mango	2	2	0.473523	pass
+P06	1144	tarantula	2	2	0.419763	pass
+P06	1145	rocking_chair	2	2	0.189991	pass
+P06	1146	cheesecake	1	1		insufficient_after_rejection
+P06	1147	lemonade	2	2	0.163155	pass
+P06	1148	broccoli	1	1		insufficient_after_rejection
+P06	1149	mole	1	1		insufficient_after_rejection
+P06	1150	chick	2	2	0.026507	pass
+P06	1151	tractor	1	1		insufficient_after_rejection
+P06	1152	speedboat	1	1		insufficient_after_rejection
+P06	1153	donut	1	1		insufficient_after_rejection
+P06	1154	chandelier	1	1		insufficient_after_rejection
+P06	1155	kale	1	1		insufficient_after_rejection
+P06	1156	coconut	1	1		insufficient_after_rejection
+P06	1157	barnacle	2	2	0.372099	pass
+P06	1158	bulldozer	1	1		insufficient_after_rejection
+P06	1159	pear	2	2	-0.320207	pass
+P06	1160	clam	2	2	-0.034890	pass
+P07	1001	limousine	2	2	0.106129	pass
+P07	1002	pea	1	1		insufficient_after_rejection
+P07	1003	shorts	1	1		insufficient_after_rejection
+P07	1004	dalmatian	1	1		insufficient_after_rejection
+P07	1005	ottoman	1	1		insufficient_after_rejection
+P07	1006	cardinal	2	2	0.298876	pass
+P07	1007	mirror	1	1		insufficient_after_rejection
+P07	1008	keyboard	1	1		insufficient_after_rejection
+P07	1009	papaya	1	1		insufficient_after_rejection
+P07	1010	pineapple	1	1		insufficient_after_rejection
+P07	1011	raspberry	1	1		insufficient_after_rejection
+P07	1012	burrito	2	2	-0.249671	pass
+P07	1013	banana	1	1		insufficient_after_rejection
+P07	1014	shark	1	1		insufficient_after_rejection
+P07	1015	moose	2	2	0.152784	pass
+P07	1016	ant	1	1		insufficient_after_rejection
+P07	1017	carrot	1	1		insufficient_after_rejection
+P07	1018	coffee	1	1		insufficient_after_rejection
+P07	1019	videocassette	1	1		insufficient_after_rejection
+P07	1020	television	2	2	0.264611	pass
+P07	1021	tea	1	1		insufficient_after_rejection
+P07	1022	shoe	1	1		insufficient_after_rejection
+P07	1023	wolf	2	2	0.212764	pass
+P07	1024	lab_coat	1	1		insufficient_after_rejection
+P07	1025	llama	1	1		insufficient_after_rejection
+P07	1026	asparagus	1	1		insufficient_after_rejection
+P07	1027	memory_stick	2	2	-0.096826	pass
+P07	1028	meatball	1	1		insufficient_after_rejection
+P07	1029	sheep	1	1		insufficient_after_rejection
+P07	1030	puffin	1	1		insufficient_after_rejection
+P07	1031	fish	1	1		insufficient_after_rejection
+P07	1032	pants	1	1		insufficient_after_rejection
+P07	1033	helmet	1	1		insufficient_after_rejection
+P07	1034	bracelet1	1	1		insufficient_after_rejection
+P07	1035	lizard	1	1		insufficient_after_rejection
+P07	1036	ladybug	1	1		insufficient_after_rejection
+P07	1037	steamroller	1	1		insufficient_after_rejection
+P07	1038	cupcake	1	1		insufficient_after_rejection
+P07	1039	sailboat	1	1		insufficient_after_rejection
+P07	1040	panda	1	1		insufficient_after_rejection
+P07	1041	octopus	1	1		insufficient_after_rejection
+P07	1042	eagle	1	1		insufficient_after_rejection
+P07	1043	ostrich	1	1		insufficient_after_rejection
+P07	1044	raccoon	1	1		insufficient_after_rejection
+P07	1045	goose	2	2	0.261606	pass
+P07	1046	tiramisu	2	2	0.086592	pass
+P07	1047	drawer	1	1		insufficient_after_rejection
+P07	1048	sombrero	1	1		insufficient_after_rejection
+P07	1049	rat	1	1		insufficient_after_rejection
+P07	1050	artichoke	1	1		insufficient_after_rejection
+P07	1051	yacht	2	2	0.310460	pass
+P07	1052	wallpaper	2	2	0.040780	pass
+P07	1053	reindeer	2	2	0.493482	pass
+P07	1054	bathtub	1	1		insufficient_after_rejection
+P07	1055	seagull	1	1		insufficient_after_rejection
+P07	1056	leggings	1	1		insufficient_after_rejection
+P07	1057	eggnog	1	1		insufficient_after_rejection
+P07	1058	loveseat	1	1		insufficient_after_rejection
+P07	1059	zucchini	2	2	0.333710	pass
+P07	1060	squirrel	2	2	0.182641	pass
+P07	1061	taco	2	2	-0.005075	pass
+P07	1062	antelope	2	2	0.192842	pass
+P07	1063	car	1	1		insufficient_after_rejection
+P07	1064	fly	1	1		insufficient_after_rejection
+P07	1065	cabinet	1	1		insufficient_after_rejection
+P07	1066	giraffe	1	1		insufficient_after_rejection
+P07	1067	taffy	1	1		insufficient_after_rejection
+P07	1068	radio	1	1		insufficient_after_rejection
+P07	1069	rollerblade	1	1		insufficient_after_rejection
+P07	1070	dragonfly	1	1		insufficient_after_rejection
+P07	1071	mongoose	2	2	0.272131	pass
+P07	1072	blackberry	1	1		insufficient_after_rejection
+P07	1073	bull	1	1		insufficient_after_rejection
+P07	1074	cobra	1	1		insufficient_after_rejection
+P07	1075	filing_cabinet	1	1		insufficient_after_rejection
+P07	1076	groundhog	1	1		insufficient_after_rejection
+P07	1077	bison	1	1		insufficient_after_rejection
+P07	1078	sea_urchin	1	1		insufficient_after_rejection
+P07	1079	puppy	1	1		insufficient_after_rejection
+P07	1080	camcorder	1	1		insufficient_after_rejection
+P07	1081	police_car	1	1		insufficient_after_rejection
+P07	1082	necklace	2	2	0.235866	pass
+P07	1083	shirt	1	1		insufficient_after_rejection
+P07	1084	cheetah	2	2	0.297131	pass
+P07	1085	frog	1	1		insufficient_after_rejection
+P07	1086	pasta	1	1		insufficient_after_rejection
+P07	1087	bathrobe	1	1		insufficient_after_rejection
+P07	1088	slipper	1	1		insufficient_after_rejection
+P07	1089	unicycle	1	1		insufficient_after_rejection
+P07	1090	garlic	1	1		insufficient_after_rejection
+P07	1091	kitten	1	1		insufficient_after_rejection
+P07	1092	bunkbed	2	2	0.031206	pass
+P07	1093	duckling	1	1		insufficient_after_rejection
+P07	1094	onion	1	1		insufficient_after_rejection
+P07	1095	mouse2	1	1		insufficient_after_rejection
+P07	1096	beaver	1	1		insufficient_after_rejection
+P07	1097	sandwich	1	1		insufficient_after_rejection
+P07	1098	stool	1	1		insufficient_after_rejection
+P07	1099	tricycle	1	1		insufficient_after_rejection
+P07	1100	champagne	1	1		insufficient_after_rejection
+P07	1101	boat	1	1		insufficient_after_rejection
+P07	1102	crab	1	1		insufficient_after_rejection
+P07	1103	blazer	1	1		insufficient_after_rejection
+P07	1104	speaker	2	2	-0.284901	pass
+P07	1105	gorilla	1	1		insufficient_after_rejection
+P07	1106	swordfish	1	1		insufficient_after_rejection
+P07	1107	omelet	1	1		insufficient_after_rejection
+P07	1108	possum	1	1		insufficient_after_rejection
+P07	1109	wasp	1	1		insufficient_after_rejection
+P07	1110	jet	2	2	0.042317	pass
+P07	1111	creme_brulee	1	1		insufficient_after_rejection
+P07	1112	hard_disk	1	1		insufficient_after_rejection
+P07	1113	firetruck	1	1		insufficient_after_rejection
+P07	1114	spinach	1	1		insufficient_after_rejection
+P07	1115	marshmallow	1	1		insufficient_after_rejection
+P07	1116	praying_mantis	1	1		insufficient_after_rejection
+P07	1117	hamster	1	1		insufficient_after_rejection
+P07	1118	candy_bar	2	2	0.265901	pass
+P07	1119	star_fruit	1	1		insufficient_after_rejection
+P07	1120	owl	2	2	0.104131	pass
+P07	1121	sunglasses	2	2	-0.564178	pass
+P07	1122	webcam	1	1		insufficient_after_rejection
+P07	1123	sorbet	1	1		insufficient_after_rejection
+P07	1124	nightshirt	2	2	0.220894	pass
+P07	1125	sundae	2	2	0.240056	pass
+P07	1126	helicopter	2	2	-0.200558	pass
+P07	1127	space_shuttle	1	1		insufficient_after_rejection
+P07	1128	toad	1	1		insufficient_after_rejection
+P07	1129	workbench	2	2	-0.027280	pass
+P07	1130	showerhead	2	2	0.074797	pass
+P07	1131	eel	1	1		insufficient_after_rejection
+P07	1132	polar_bear	2	2	0.073347	pass
+P07	1133	cockatoo	1	1		insufficient_after_rejection
+P07	1134	sleeping_bag	2	2	-0.032362	pass
+P07	1135	pony	1	1		insufficient_after_rejection
+P07	1136	snake	1	1		insufficient_after_rejection
+P07	1137	lamb	1	1		insufficient_after_rejection
+P07	1138	ping-pong_table	1	1		insufficient_after_rejection
+P07	1139	earwig	1	1		insufficient_after_rejection
+P07	1140	kayak	1	1		insufficient_after_rejection
+P07	1141	peach	1	1		insufficient_after_rejection
+P07	1142	piglet	1	1		insufficient_after_rejection
+P07	1143	mango	2	2	0.036378	pass
+P07	1144	tarantula	2	2	0.168941	pass
+P07	1145	rocking_chair	2	2	-0.212265	pass
+P07	1146	cheesecake	1	1		insufficient_after_rejection
+P07	1147	lemonade	2	2	0.128981	pass
+P07	1148	broccoli	1	1		insufficient_after_rejection
+P07	1149	mole	1	1		insufficient_after_rejection
+P07	1150	chick	2	2	0.103123	pass
+P07	1151	tractor	1	1		insufficient_after_rejection
+P07	1152	speedboat	1	1		insufficient_after_rejection
+P07	1153	donut	1	1		insufficient_after_rejection
+P07	1154	chandelier	1	1		insufficient_after_rejection
+P07	1155	kale	1	1		insufficient_after_rejection
+P07	1156	coconut	1	1		insufficient_after_rejection
+P07	1157	barnacle	2	2	0.118013	pass
+P07	1158	bulldozer	1	1		insufficient_after_rejection
+P07	1159	pear	2	2	0.082788	pass
+P07	1160	clam	2	2	-0.004603	pass
+melina	1001	limousine	2	2	0.608345	pass
+melina	1002	pea	1	1		insufficient_after_rejection
+melina	1003	shorts	1	1		insufficient_after_rejection
+melina	1004	dalmatian	1	1		insufficient_after_rejection
+melina	1005	ottoman	1	1		insufficient_after_rejection
+melina	1006	cardinal	2	2	0.623402	pass
+melina	1007	mirror	1	1		insufficient_after_rejection
+melina	1008	keyboard	1	1		insufficient_after_rejection
+melina	1009	papaya	1	1		insufficient_after_rejection
+melina	1010	pineapple	1	1		insufficient_after_rejection
+melina	1011	raspberry	1	1		insufficient_after_rejection
+melina	1012	burrito	2	2	0.654385	pass
+melina	1013	banana	1	1		insufficient_after_rejection
+melina	1014	shark	1	1		insufficient_after_rejection
+melina	1015	moose	2	2	0.291009	pass
+melina	1016	ant	1	1		insufficient_after_rejection
+melina	1017	carrot	1	1		insufficient_after_rejection
+melina	1018	coffee	1	1		insufficient_after_rejection
+melina	1019	videocassette	1	1		insufficient_after_rejection
+melina	1020	television	2	2	0.143118	pass
+melina	1021	tea	1	1		insufficient_after_rejection
+melina	1022	shoe	1	1		insufficient_after_rejection
+melina	1023	wolf	2	2	0.546871	pass
+melina	1024	lab_coat	1	1		insufficient_after_rejection
+melina	1025	llama	1	1		insufficient_after_rejection
+melina	1026	asparagus	1	1		insufficient_after_rejection
+melina	1027	memory_stick	2	2	0.413889	pass
+melina	1028	meatball	1	1		insufficient_after_rejection
+melina	1029	sheep	1	1		insufficient_after_rejection
+melina	1030	puffin	1	1		insufficient_after_rejection
+melina	1031	fish	1	1		insufficient_after_rejection
+melina	1032	pants	1	1		insufficient_after_rejection
+melina	1033	helmet	1	1		insufficient_after_rejection
+melina	1034	bracelet1	1	1		insufficient_after_rejection
+melina	1035	lizard	1	1		insufficient_after_rejection
+melina	1036	ladybug	1	1		insufficient_after_rejection
+melina	1037	steamroller	1	1		insufficient_after_rejection
+melina	1038	cupcake	1	1		insufficient_after_rejection
+melina	1039	sailboat	1	1		insufficient_after_rejection
+melina	1040	panda	1	1		insufficient_after_rejection
+melina	1041	octopus	1	1		insufficient_after_rejection
+melina	1042	eagle	1	1		insufficient_after_rejection
+melina	1043	ostrich	1	1		insufficient_after_rejection
+melina	1044	raccoon	1	1		insufficient_after_rejection
+melina	1045	goose	2	2	0.704906	pass
+melina	1046	tiramisu	2	2	0.342938	pass
+melina	1047	drawer	1	1		insufficient_after_rejection
+melina	1048	sombrero	1	1		insufficient_after_rejection
+melina	1049	rat	1	1		insufficient_after_rejection
+melina	1050	artichoke	1	1		insufficient_after_rejection
+melina	1051	yacht	2	2	0.444623	pass
+melina	1052	wallpaper	2	2	0.028900	pass
+melina	1053	reindeer	2	2	-0.227411	pass
+melina	1054	bathtub	1	1		insufficient_after_rejection
+melina	1055	seagull	1	1		insufficient_after_rejection
+melina	1056	leggings	1	1		insufficient_after_rejection
+melina	1057	eggnog	1	1		insufficient_after_rejection
+melina	1058	loveseat	1	1		insufficient_after_rejection
+melina	1059	zucchini	2	2	0.614203	pass
+melina	1060	squirrel	2	2	0.516822	pass
+melina	1061	taco	2	2	0.477256	pass
+melina	1062	antelope	2	2	0.557323	pass
+melina	1063	car	1	1		insufficient_after_rejection
+melina	1064	fly	1	1		insufficient_after_rejection
+melina	1065	cabinet	1	1		insufficient_after_rejection
+melina	1066	giraffe	1	1		insufficient_after_rejection
+melina	1067	taffy	1	1		insufficient_after_rejection
+melina	1068	radio	1	1		insufficient_after_rejection
+melina	1069	rollerblade	1	1		insufficient_after_rejection
+melina	1070	dragonfly	1	1		insufficient_after_rejection
+melina	1071	mongoose	2	2	0.074606	pass
+melina	1072	blackberry	1	1		insufficient_after_rejection
+melina	1073	bull	1	1		insufficient_after_rejection
+melina	1074	cobra	1	1		insufficient_after_rejection
+melina	1075	filing_cabinet	1	1		insufficient_after_rejection
+melina	1076	groundhog	1	1		insufficient_after_rejection
+melina	1077	bison	1	1		insufficient_after_rejection
+melina	1078	sea_urchin	1	1		insufficient_after_rejection
+melina	1079	puppy	1	1		insufficient_after_rejection
+melina	1080	camcorder	1	1		insufficient_after_rejection
+melina	1081	police_car	1	1		insufficient_after_rejection
+melina	1082	necklace	2	2	0.268297	pass
+melina	1083	shirt	1	1		insufficient_after_rejection
+melina	1084	cheetah	2	2	0.611410	pass
+melina	1085	frog	1	1		insufficient_after_rejection
+melina	1086	pasta	1	1		insufficient_after_rejection
+melina	1087	bathrobe	1	1		insufficient_after_rejection
+melina	1088	slipper	1	1		insufficient_after_rejection
+melina	1089	unicycle	1	1		insufficient_after_rejection
+melina	1090	garlic	1	1		insufficient_after_rejection
+melina	1091	kitten	1	1		insufficient_after_rejection
+melina	1092	bunkbed	2	2	0.408755	pass
+melina	1093	duckling	1	1		insufficient_after_rejection
+melina	1094	onion	1	1		insufficient_after_rejection
+melina	1095	mouse2	1	1		insufficient_after_rejection
+melina	1096	beaver	1	1		insufficient_after_rejection
+melina	1097	sandwich	1	1		insufficient_after_rejection
+melina	1098	stool	1	1		insufficient_after_rejection
+melina	1099	tricycle	1	1		insufficient_after_rejection
+melina	1100	champagne	1	1		insufficient_after_rejection
+melina	1101	boat	1	1		insufficient_after_rejection
+melina	1102	crab	1	1		insufficient_after_rejection
+melina	1103	blazer	1	1		insufficient_after_rejection
+melina	1104	speaker	2	2	0.334379	pass
+melina	1105	gorilla	1	1		insufficient_after_rejection
+melina	1106	swordfish	1	1		insufficient_after_rejection
+melina	1107	omelet	1	1		insufficient_after_rejection
+melina	1108	possum	1	1		insufficient_after_rejection
+melina	1109	wasp	1	1		insufficient_after_rejection
+melina	1110	jet	2	2	0.036153	pass
+melina	1111	creme_brulee	1	1		insufficient_after_rejection
+melina	1112	hard_disk	1	1		insufficient_after_rejection
+melina	1113	firetruck	1	1		insufficient_after_rejection
+melina	1114	spinach	1	1		insufficient_after_rejection
+melina	1115	marshmallow	1	1		insufficient_after_rejection
+melina	1116	praying_mantis	1	1		insufficient_after_rejection
+melina	1117	hamster	1	1		insufficient_after_rejection
+melina	1118	candy_bar	2	2	0.300485	pass
+melina	1119	star_fruit	1	1		insufficient_after_rejection
+melina	1120	owl	2	2	0.668262	pass
+melina	1121	sunglasses	2	2	-0.067242	pass
+melina	1122	webcam	1	1		insufficient_after_rejection
+melina	1123	sorbet	1	1		insufficient_after_rejection
+melina	1124	nightshirt	2	2	0.186604	pass
+melina	1125	sundae	2	2	0.126920	pass
+melina	1126	helicopter	2	2	0.799169	pass
+melina	1127	space_shuttle	1	1		insufficient_after_rejection
+melina	1128	toad	1	1		insufficient_after_rejection
+melina	1129	workbench	2	2	0.556607	pass
+melina	1130	showerhead	2	2	0.580096	pass
+melina	1131	eel	1	1		insufficient_after_rejection
+melina	1132	polar_bear	2	2	0.626880	pass
+melina	1133	cockatoo	1	1		insufficient_after_rejection
+melina	1134	sleeping_bag	2	2	-0.112342	pass
+melina	1135	pony	1	1		insufficient_after_rejection
+melina	1136	snake	1	1		insufficient_after_rejection
+melina	1137	lamb	1	1		insufficient_after_rejection
+melina	1138	ping-pong_table	1	1		insufficient_after_rejection
+melina	1139	earwig	1	1		insufficient_after_rejection
+melina	1140	kayak	1	1		insufficient_after_rejection
+melina	1141	peach	1	1		insufficient_after_rejection
+melina	1142	piglet	1	1		insufficient_after_rejection
+melina	1143	mango	2	2	0.007300	pass
+melina	1144	tarantula	2	2	0.612894	pass
+melina	1145	rocking_chair	2	2	0.418844	pass
+melina	1146	cheesecake	1	1		insufficient_after_rejection
+melina	1147	lemonade	2	2	-0.175532	pass
+melina	1148	broccoli	1	1		insufficient_after_rejection
+melina	1149	mole	1	1		insufficient_after_rejection
+melina	1150	chick	2	2	-0.050114	pass
+melina	1151	tractor	1	1		insufficient_after_rejection
+melina	1152	speedboat	1	1		insufficient_after_rejection
+melina	1153	donut	1	1		insufficient_after_rejection
+melina	1154	chandelier	1	1		insufficient_after_rejection
+melina	1155	kale	1	1		insufficient_after_rejection
+melina	1156	coconut	1	1		insufficient_after_rejection
+melina	1157	barnacle	2	2	0.562347	pass
+melina	1158	bulldozer	1	1		insufficient_after_rejection
+melina	1159	pear	2	2	0.526231	pass
+melina	1160	clam	2	2	0.475345	pass
+zar	1001	limousine	2	2	0.588406	pass
+zar	1002	pea	1	1		insufficient_after_rejection
+zar	1003	shorts	1	1		insufficient_after_rejection
+zar	1004	dalmatian	1	1		insufficient_after_rejection
+zar	1005	ottoman	1	1		insufficient_after_rejection
+zar	1006	cardinal	2	1		insufficient_after_rejection
+zar	1007	mirror	1	1		insufficient_after_rejection
+zar	1008	keyboard	1	1		insufficient_after_rejection
+zar	1009	papaya	1	1		insufficient_after_rejection
+zar	1010	pineapple	1	1		insufficient_after_rejection
+zar	1011	raspberry	1	1		insufficient_after_rejection
+zar	1012	burrito	2	2	0.633499	pass
+zar	1013	banana	1	1		insufficient_after_rejection
+zar	1014	shark	1	1		insufficient_after_rejection
+zar	1015	moose	2	2	0.578444	pass
+zar	1016	ant	1	1		insufficient_after_rejection
+zar	1017	carrot	1	1		insufficient_after_rejection
+zar	1018	coffee	1	1		insufficient_after_rejection
+zar	1019	videocassette	1	1		insufficient_after_rejection
+zar	1020	television	2	2	0.565416	pass
+zar	1021	tea	1	1		insufficient_after_rejection
+zar	1022	shoe	1	1		insufficient_after_rejection
+zar	1023	wolf	2	2	0.659752	pass
+zar	1024	lab_coat	1	0		insufficient_after_rejection
+zar	1025	llama	1	1		insufficient_after_rejection
+zar	1026	asparagus	1	1		insufficient_after_rejection
+zar	1027	memory_stick	2	2	0.477204	pass
+zar	1028	meatball	1	1		insufficient_after_rejection
+zar	1029	sheep	1	1		insufficient_after_rejection
+zar	1030	puffin	1	0		insufficient_after_rejection
+zar	1031	fish	1	1		insufficient_after_rejection
+zar	1032	pants	1	1		insufficient_after_rejection
+zar	1033	helmet	1	1		insufficient_after_rejection
+zar	1034	bracelet1	1	1		insufficient_after_rejection
+zar	1035	lizard	1	1		insufficient_after_rejection
+zar	1036	ladybug	1	1		insufficient_after_rejection
+zar	1037	steamroller	1	1		insufficient_after_rejection
+zar	1038	cupcake	1	1		insufficient_after_rejection
+zar	1039	sailboat	1	1		insufficient_after_rejection
+zar	1040	panda	1	1		insufficient_after_rejection
+zar	1041	octopus	1	1		insufficient_after_rejection
+zar	1042	eagle	1	1		insufficient_after_rejection
+zar	1043	ostrich	1	1		insufficient_after_rejection
+zar	1044	raccoon	1	1		insufficient_after_rejection
+zar	1045	goose	2	1		insufficient_after_rejection
+zar	1046	tiramisu	2	2	0.638415	pass
+zar	1047	drawer	1	1		insufficient_after_rejection
+zar	1048	sombrero	1	1		insufficient_after_rejection
+zar	1049	rat	1	1		insufficient_after_rejection
+zar	1050	artichoke	1	0		insufficient_after_rejection
+zar	1051	yacht	2	2	0.601645	pass
+zar	1052	wallpaper	2	2	0.206784	pass
+zar	1053	reindeer	2	2	0.499404	pass
+zar	1054	bathtub	1	0		insufficient_after_rejection
+zar	1055	seagull	1	1		insufficient_after_rejection
+zar	1056	leggings	1	1		insufficient_after_rejection
+zar	1057	eggnog	1	1		insufficient_after_rejection
+zar	1058	loveseat	1	1		insufficient_after_rejection
+zar	1059	zucchini	2	2	0.663322	pass
+zar	1060	squirrel	2	2	0.532070	pass
+zar	1061	taco	2	1		insufficient_after_rejection
+zar	1062	antelope	2	2	0.752335	pass
+zar	1063	car	1	1		insufficient_after_rejection
+zar	1064	fly	1	1		insufficient_after_rejection
+zar	1065	cabinet	1	1		insufficient_after_rejection
+zar	1066	giraffe	1	1		insufficient_after_rejection
+zar	1067	taffy	1	1		insufficient_after_rejection
+zar	1068	radio	1	1		insufficient_after_rejection
+zar	1069	rollerblade	1	1		insufficient_after_rejection
+zar	1070	dragonfly	1	1		insufficient_after_rejection
+zar	1071	mongoose	2	1		insufficient_after_rejection
+zar	1072	blackberry	1	1		insufficient_after_rejection
+zar	1073	bull	1	1		insufficient_after_rejection
+zar	1074	cobra	1	1		insufficient_after_rejection
+zar	1075	filing_cabinet	1	1		insufficient_after_rejection
+zar	1076	groundhog	1	0		insufficient_after_rejection
+zar	1077	bison	1	1		insufficient_after_rejection
+zar	1078	sea_urchin	1	1		insufficient_after_rejection
+zar	1079	puppy	1	1		insufficient_after_rejection
+zar	1080	camcorder	1	1		insufficient_after_rejection
+zar	1081	police_car	1	1		insufficient_after_rejection
+zar	1082	necklace	2	2	0.823562	pass
+zar	1083	shirt	1	1		insufficient_after_rejection
+zar	1084	cheetah	2	2	0.259667	pass
+zar	1085	frog	1	1		insufficient_after_rejection
+zar	1086	pasta	1	1		insufficient_after_rejection
+zar	1087	bathrobe	1	1		insufficient_after_rejection
+zar	1088	slipper	1	1		insufficient_after_rejection
+zar	1089	unicycle	1	1		insufficient_after_rejection
+zar	1090	garlic	1	1		insufficient_after_rejection
+zar	1091	kitten	1	1		insufficient_after_rejection
+zar	1092	bunkbed	2	2	0.686230	pass
+zar	1093	duckling	1	1		insufficient_after_rejection
+zar	1094	onion	1	1		insufficient_after_rejection
+zar	1095	mouse2	1	1		insufficient_after_rejection
+zar	1096	beaver	1	0		insufficient_after_rejection
+zar	1097	sandwich	1	0		insufficient_after_rejection
+zar	1098	stool	1	1		insufficient_after_rejection
+zar	1099	tricycle	1	1		insufficient_after_rejection
+zar	1100	champagne	1	1		insufficient_after_rejection
+zar	1101	boat	1	1		insufficient_after_rejection
+zar	1102	crab	1	1		insufficient_after_rejection
+zar	1103	blazer	1	1		insufficient_after_rejection
+zar	1104	speaker	2	2	0.518904	pass
+zar	1105	gorilla	1	1		insufficient_after_rejection
+zar	1106	swordfish	1	1		insufficient_after_rejection
+zar	1107	omelet	1	1		insufficient_after_rejection
+zar	1108	possum	1	1		insufficient_after_rejection
+zar	1109	wasp	1	1		insufficient_after_rejection
+zar	1110	jet	2	1		insufficient_after_rejection
+zar	1111	creme_brulee	1	1		insufficient_after_rejection
+zar	1112	hard_disk	1	1		insufficient_after_rejection
+zar	1113	firetruck	1	1		insufficient_after_rejection
+zar	1114	spinach	1	1		insufficient_after_rejection
+zar	1115	marshmallow	1	1		insufficient_after_rejection
+zar	1116	praying_mantis	1	1		insufficient_after_rejection
+zar	1117	hamster	1	1		insufficient_after_rejection
+zar	1118	candy_bar	2	2	0.687028	pass
+zar	1119	star_fruit	1	1		insufficient_after_rejection
+zar	1120	owl	2	2	0.440289	pass
+zar	1121	sunglasses	2	2	0.239351	pass
+zar	1122	webcam	1	1		insufficient_after_rejection
+zar	1123	sorbet	1	1		insufficient_after_rejection
+zar	1124	nightshirt	2	2	0.392260	pass
+zar	1125	sundae	2	1		insufficient_after_rejection
+zar	1126	helicopter	2	2	0.109213	pass
+zar	1127	space_shuttle	1	1		insufficient_after_rejection
+zar	1128	toad	1	1		insufficient_after_rejection
+zar	1129	workbench	2	2	0.394194	pass
+zar	1130	showerhead	2	1		insufficient_after_rejection
+zar	1131	eel	1	1		insufficient_after_rejection
+zar	1132	polar_bear	2	2	0.257713	pass
+zar	1133	cockatoo	1	0		insufficient_after_rejection
+zar	1134	sleeping_bag	2	2	0.524993	pass
+zar	1135	pony	1	1		insufficient_after_rejection
+zar	1136	snake	1	1		insufficient_after_rejection
+zar	1137	lamb	1	0		insufficient_after_rejection
+zar	1138	ping-pong_table	1	1		insufficient_after_rejection
+zar	1139	earwig	1	1		insufficient_after_rejection
+zar	1140	kayak	1	1		insufficient_after_rejection
+zar	1141	peach	1	1		insufficient_after_rejection
+zar	1142	piglet	1	0		insufficient_after_rejection
+zar	1143	mango	2	1		insufficient_after_rejection
+zar	1144	tarantula	2	1		insufficient_after_rejection
+zar	1145	rocking_chair	2	2	0.441125	pass
+zar	1146	cheesecake	1	0		insufficient_after_rejection
+zar	1147	lemonade	2	2	0.174538	pass
+zar	1148	broccoli	1	1		insufficient_after_rejection
+zar	1149	mole	1	1		insufficient_after_rejection
+zar	1150	chick	2	2	0.412664	pass
+zar	1151	tractor	1	1		insufficient_after_rejection
+zar	1152	speedboat	1	1		insufficient_after_rejection
+zar	1153	donut	1	1		insufficient_after_rejection
+zar	1154	chandelier	1	1		insufficient_after_rejection
+zar	1155	kale	1	1		insufficient_after_rejection
+zar	1156	coconut	1	1		insufficient_after_rejection
+zar	1157	barnacle	2	2	0.497489	pass
+zar	1158	bulldozer	1	1		insufficient_after_rejection
+zar	1159	pear	2	2	0.685769	pass
+zar	1160	clam	2	2	0.323824	pass

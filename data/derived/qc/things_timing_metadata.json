@@ -1,0 +1,14 @@
+{
+  "things_root": "/media/psycontrol/HDD/Datasets/THINGS",
+  "raw_eeg_files_found": 80,
+  "raw_eeg_example": "/media/psycontrol/HDD/Datasets/THINGS/raw_eeg/sub-01/ses-01/raw_eeg_test.npy",
+  "raw_sfreq_hz": 1000.0,
+  "raw_keys": "raw_eeg_data,ch_names,ch_types,sfreq,highpass,lowpass",
+  "local_physical_stimulus_duration_available": false,
+  "model_preprocessing_epoch_tmin_s": -0.2,
+  "model_preprocessing_epoch_tmax_s": 1.0,
+  "model_input_window_start_s": 0.0,
+  "model_input_window_end_s": 1.0,
+  "model_input_samples": 250,
+  "note": "Local THINGS raw_eeg npy files expose continuous EEG and sfreq, but not event/stimulus-duration metadata. Repo preprocessing epochs -0.2..1.0 s, drops the first 0.2 s baseline, and ATMS consumes the first 250 samples."
+}

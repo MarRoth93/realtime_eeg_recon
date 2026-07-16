@@ -1,0 +1,15 @@
+{
+  "epoch_npz": "lab_data/derived/lab_starstim31_epochs_250hz.npz",
+  "split_manifest": "lab_data/derived/finetune/lab_finetune_split_manifest.tsv",
+  "target_manifest": "lab_data/derived/finetune/lab_target_manifest.tsv",
+  "feature_cache": "lab_data/derived/finetune/lab_vith14_features.pt",
+  "checkpoint": "models/starstim31/contrast/best_model/best_model.pth",
+  "out_dir": "lab_data/derived/finetune/zeroshot",
+  "device": "cuda",
+  "batch_size": "32",
+  "num_workers": "0",
+  "model_name": "ViT-H-14",
+  "pretrained": "laion2b_s32b_b79k",
+  "encode_batch_size": "8",
+  "skip_feature_encoding": "False"
+}

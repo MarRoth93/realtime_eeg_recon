@@ -1,0 +1,5 @@
+plot_path
+lab_data/derived/qc/plots/amplitude_peak_abs_by_subject.png
+lab_data/derived/qc/plots/psd_after_preprocessing_transfer_channels.png
+lab_data/derived/qc/plots/repeat_reliability_by_subject.png
+lab_data/derived/qc/plots/stimulus_duration_vs_model_window.png

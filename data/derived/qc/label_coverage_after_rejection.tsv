@@ -1,0 +1,7 @@
+subject_folder	trials_total	trials_usable	unique_triggers_total	unique_triggers_usable	triggers_lost_after_rejection	repeated_triggers_total	repeated_triggers_with_2_usable	singletons_usable
+P04	200	191	160	157	3	40	34	123
+P05	200	200	160	160	0	40	40	120
+P06	200	200	160	160	0	40	40	120
+P07	200	200	160	160	0	40	40	120
+melina	200	200	160	160	0	40	40	120
+zar	200	180	160	149	11	40	31	118

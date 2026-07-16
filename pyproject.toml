@@ -46,6 +46,11 @@ full = [
     "open_clip_torch>=2.20.0",
     "openneuro-py",
 ]
+# Offline lab calibration only (ICA operator fitting). The realtime apply path
+# needs none of this — calibrated operators are plain NumPy matrices.
+calibration = [
+    "mne-icalabel",
+]
 # Extra EEG/vision packages present in the conda BCI env (environment.yml pip: block).
 lab = [
     "braindecode==1.2.0",

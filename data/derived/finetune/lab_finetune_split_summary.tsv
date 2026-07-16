@@ -1,0 +1,3 @@
+split	triggers	epochs_total	epochs_usable	subjects	repeated_triggers_with_2_usable
+train	128	936	915	6	128
+val	32	264	256	6	32

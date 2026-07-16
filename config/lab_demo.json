@@ -22,5 +22,11 @@
   "marker_test_required": false,
   "marker_heartbeat_timeout_seconds": null,
   "legacy_start_on_first_trigger": true,
-  "open_browser": true
+  "open_browser": true,
+  "bandpass_l_freq": 0.01,
+  "bandpass_h_freq": 30.0,
+  "filter_order": 4,
+  "reject_peak_to_peak_uv": 250.0,
+  "ica_operator": null,
+  "whitening_matrix": null
 }

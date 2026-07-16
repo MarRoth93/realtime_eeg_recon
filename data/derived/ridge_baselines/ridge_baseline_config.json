@@ -1,0 +1,25 @@
+{
+  "epoch_npz": "lab_data/derived/baseline_epochs/lab_starstim31_epochs_250hz.npz",
+  "split_manifest": "lab_data/derived/finetune/lab_finetune_split_manifest.tsv",
+  "feature_cache": "lab_data/derived/finetune/lab_vith14_features.pt",
+  "baseline_window": [
+    -0.2,
+    0.0
+  ],
+  "decode_window": [
+    0.08,
+    0.7
+  ],
+  "n_time_bins": 6,
+  "alpha_grid": [
+    0.1,
+    1.0,
+    10.0,
+    100.0,
+    1000.0
+  ],
+  "chance_split_top1": 0.03125,
+  "chance_split_top5": 0.15625,
+  "chance_all160_top1": 0.00625,
+  "chance_all160_top5": 0.03125
+}

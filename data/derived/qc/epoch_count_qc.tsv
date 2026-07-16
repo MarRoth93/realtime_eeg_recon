@@ -1,0 +1,7 @@
+subject_folder	epochs_total	epochs_valid	artifact_review_epochs	usable_after_rejection	rejected_after_qc	rejection_rate
+P04	200	200	9	191	9	0.045000
+P05	200	200	0	200	0	0.000000
+P06	200	200	0	200	0	0.000000
+P07	200	200	0	200	0	0.000000
+melina	200	200	0	200	0	0.000000
+zar	200	200	20	180	20	0.100000

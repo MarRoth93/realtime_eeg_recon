@@ -1,0 +1,7 @@
+metric	observed	target	status	why
+epoch_shape	(1200, 31, 250)	(n, 31, 250)	pass	ATMS checkpoint expects 31 Starstim channels and 250 time samples.
+usable_epoch_rate_after_artifact_qc	0.9758	>= 0.85	pass	Fine-tuning should not be dominated by rejected/high-amplitude epochs.
+min_unique_triggers_after_rejection_per_subject	149	>= 150	review	Image-label coverage should remain broad after artifact rejection.
+median_repeat_reliability_corr	0.2876	> 0	pass	Positive repeat reliability suggests timing/preprocessing is at least directionally coherent.
+max_subject_peak_abs_p95_uv	307.72	<= 250	review	Large p95 peak amplitude can indicate residual artifacts or bad referencing.
+lab_stimulus_display_duration_s	3.9876	document vs THINGS paradigm; model input uses 0-1 s EEG	review	Lab images stay visible much longer than the 1 s model EEG window; local THINGS raw files do not include physical stimulus duration metadata.
