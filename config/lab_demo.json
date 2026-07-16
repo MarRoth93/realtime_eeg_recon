@@ -18,7 +18,7 @@
   "prior_checkpoint": "checkpoints/hierarchical/lab_prior_starstim31_best_fdn.pt",
   "enable_experimental_unseen_high_level": false,
   "legacy_trigger_map": "data/derived/finetune/lab_target_manifest.tsv",
-  "image_root": "/media/psycontrol/HDD/Datasets/THINGS/images_THINGS/object_images",
+  "image_root": "data/images_THINGS/object_images",
   "marker_test_required": false,
   "marker_heartbeat_timeout_seconds": null,
   "legacy_start_on_first_trigger": true,

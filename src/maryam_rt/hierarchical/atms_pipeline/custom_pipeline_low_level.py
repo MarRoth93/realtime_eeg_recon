@@ -591,15 +591,39 @@ class Generator4Embeds:
         # path = "/home/ldy/Workspace/sdxl-turbo/f4b0486b498f84668e828044de1d0c8ba486e05b"
         pipe = DiffusionPipeline.from_pretrained("stabilityai/sdxl-turbo", torch_dtype=torch.bfloat16, variant="fp16")
         # pipe = DiffusionPipeline.from_pretrained(path, torch_dtype=torch.bfloat16, variant="fp16")
-        pipe.to(device)
         pipe.generate_ip_adapter_embeds = generate_ip_adapter_embeds.__get__(pipe)
         # load ip adapter
         pipe.load_ip_adapter(
-            "h94/IP-Adapter", subfolder="sdxl_models", 
-            weight_name="ip-adapter_sdxl_vit-h.bin", 
+            "h94/IP-Adapter", subfolder="sdxl_models",
+            weight_name="ip-adapter_sdxl_vit-h.bin",
             torch_dtype=torch.bfloat16)
         # set ip_adapter scale (defauld is 1)
         pipe.set_ip_adapter_scale(1)
+        # Place the pipeline on the GPU. The full SDXL-Turbo + ViT-H IP-Adapter
+        # stack does not fit alongside the live low-level model on a small card
+        # (e.g. 12 GB), so on those we fall back to accelerate's model CPU
+        # offload: only the active submodule is resident, and the ViT-H image
+        # encoder — unused here because generate() is fed precomputed
+        # ip_adapter_embeds — stays on CPU. This is the slow background path, so
+        # the extra host<->device copies are acceptable. Force with the
+        # REALTIME_HIGHLEVEL_CPU_OFFLOAD env var (1/0); auto-enabled under 16 GB.
+        import os
+
+        offload_flag = os.environ.get("REALTIME_HIGHLEVEL_CPU_OFFLOAD")
+        if offload_flag is None:
+            try:
+                dev = torch.device(device)
+                idx = dev.index if dev.index is not None else torch.cuda.current_device()
+                total_gb = torch.cuda.get_device_properties(idx).total_memory / (1024 ** 3)
+            except Exception:
+                total_gb = 0.0
+            use_offload = 0.0 < total_gb < 16.0
+        else:
+            use_offload = offload_flag.strip().lower() not in {"", "0", "false", "no"}
+        if use_offload:
+            pipe.enable_model_cpu_offload(device=device)
+        else:
+            pipe.to(device)
         self.pipe = pipe
 
     def generate(self, image_embeds, text_prompt='', generator=None, low_level_image=None, low_level_latent=None):
